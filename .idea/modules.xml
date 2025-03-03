@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/investment-dashboard.iml" filepath="$PROJECT_DIR$/.idea/investment-dashboard.iml" />
+      <module fileurl="file://$PROJECT_DIR$/investment-dashboard-frontend.iml" filepath="$PROJECT_DIR$/investment-dashboard-frontend.iml" />
     </modules>
   </component>
 </project>
