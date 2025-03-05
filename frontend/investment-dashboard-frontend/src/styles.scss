@@ -1,0 +1,29 @@
+/* Import your theme */
+@use 'styles/theme';
+
+/* Global styles */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f5f5f5;
+}
+
+/* Utility classes */
+.full-width {
+  width: 100%;
+}
+
+.mb-2 {
+  margin-bottom: 16px;
+}
+
+/* Card styling */
+.mat-mdc-card {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+}
