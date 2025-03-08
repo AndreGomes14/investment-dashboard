@@ -4,9 +4,9 @@ A fullstack application for monitoring investment portfolios in real-time.
 
 ## Technologies
 
-- Backend: Java 17/21 with Spring Boot 3.x
+- Backend: Java 17 with Spring Boot 3.4
 - Frontend: Angular 17
-- Database: PostgreSQL 15
+- Database: PostgreSQL
 
 ## Development Setup
 
@@ -21,16 +21,16 @@ A fullstack application for monitoring investment portfolios in real-time.
 
 1. Start the database:
    docker-compose up -d
-   Copy
+   
 2. Start the backend:
    cd backend
    ./mvnw spring-boot:run
-   Copy
+   
 3. Start the frontend:
    cd frontend/investment-dashboard-frontend
    npm install
    npm start
-   Copy
+   
 4. Access the application:
 - Frontend: http://localhost:4200
 - Backend API: http://localhost:8080/api
