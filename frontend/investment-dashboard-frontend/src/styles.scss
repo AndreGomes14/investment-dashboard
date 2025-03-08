@@ -1,0 +1,16 @@
+// src/styles.scss
+@use '@angular/material' as mat;
+
+// Use a prebuilt theme
+@import '@angular/material/prebuilt-themes/azure-blue.css';
+
+// Global styles
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+// Add any other global styles
+.full-width {
+  width: 100%;
+}
+
+// Other global styles...

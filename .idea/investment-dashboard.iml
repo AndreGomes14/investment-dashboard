@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="JAVA_MODULE" version="4">
+  <component name="FacetManager">
+    <facet type="jpa" name="JPA">
+      <configuration>
+        <setting name="validation-enabled" value="true" />
+        <setting name="provider-name" value="Hibernate" />
+        <datasource-mapping>
+          <factory-entry name="investment-dashboard" />
+        </datasource-mapping>
+        <naming-strategy-map />
+      </configuration>
+    </facet>
+  </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
@@ -7,5 +19,44 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Maven: org.mapstruct:mapstruct:1.5.3.Final" level="project" />
+    <orderEntry type="module-library" scope="PROVIDED">
+      <library>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.30/lombok-1.18.30.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="library" name="Maven: com.fasterxml.jackson.core:jackson-annotations:2.18.2" level="project" />
+    <orderEntry type="library" name="Maven: jakarta.persistence:jakarta.persistence-api:3.1.0" level="project" />
+    <orderEntry type="library" name="Maven: jakarta.validation:jakarta.validation-api:3.0.2" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-jpa:3.4.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-context:6.2.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-context:6.2.2" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-jpa:3.2.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-commons:3.4.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-beans:6.2.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot-autoconfigure:3.4.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot:3.4.3" level="project" />
+    <orderEntry type="library" name="Maven: org.hibernate.orm:hibernate-core:6.6.8.Final" level="project" />
+    <orderEntry type="library" name="Maven: org.mapstruct:mapstruct:1.6.3" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-jpa:3.2.4" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-context:6.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot-autoconfigure:3.2.4" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot:3.2.4" level="project" />
+    <orderEntry type="library" name="Maven: org.hibernate.orm:hibernate-core:6.4.4.Final" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-beans:6.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.aspectj:aspectjweaver:1.9.20" level="project" />
+    <orderEntry type="library" name="Maven: com.h2database:h2:2.1.214" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-jpa:3.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.tomcat.embed:tomcat-embed-core:10.1.15" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-context:6.0.13" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.data:spring-data-commons:3.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework:spring-beans:6.0.13" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot:3.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot-autoconfigure:3.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.hibernate.orm:hibernate-core:6.2.13.Final" level="project" />
   </component>
 </module>

@@ -1,10 +1,11 @@
-import { Routes } from '@angular/router';
-import {AuthGuard} from './guards/auth.guard';
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './guards/auth.guard';
 
-export const routes: Routes = [
+const routes: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'auth/login',
     pathMatch: 'full'
   },
   {
@@ -26,6 +27,12 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'dashboard'
+    redirectTo: 'auth/login'
   }
 ];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }

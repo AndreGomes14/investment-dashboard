@@ -1,0 +1,24 @@
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.content {
+  padding: 84px 20px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
