@@ -1,32 +1,57 @@
-/* src/app/auth/login/login.component.scss */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background-color: #f5f5f5;
+/* Remove any existing container styles that might be creating extra space */
+.login-container, .register-container {
+  /* These classes should NOT add any extra margins or padding */
+  display: block;
+  width: 100%;
 }
 
-.login-card {
+.login-card, .register-card {
   width: 100%;
   max-width: 400px;
-  padding: 20px;
+  padding: 24px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+  /* Center the card if needed */
+  margin: 0 auto;
+}
+
+mat-card-header {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+  padding: 0;
+
+  .mat-mdc-card-header-text {
+    margin: 0;
+    text-align: center;
+  }
+
+  mat-card-title {
+    font-size: 24px;
+    color: #0d47a1;
+    font-weight: 500;
+    margin-bottom: 24px;
+  }
 }
 
 .full-width {
   width: 100%;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .form-actions {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
-.login-button {
+.login-button, .register-button {
   width: 100%;
-  height: 45px;
+  height: 46px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .spinner {
@@ -35,14 +60,36 @@
 
 .card-footer {
   text-align: center;
-  padding: 15px 0;
+  padding: 18px 0 8px;
+
+  p {
+    color: #455a64;
+    margin: 0;
+  }
+
+  a {
+    color: #1e88e5;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
 }
 
-a {
-  color: #3f51b5;
-  text-decoration: none;
+/* Add this to both login.component.scss and register.component.scss */
+
+.card-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  padding-top: 16px;
+
+  img {
+    max-width: 120px;
+    height: auto;
+    display: block;
+  }
 }
 
-a:hover {
-  text-decoration: underline;
-}

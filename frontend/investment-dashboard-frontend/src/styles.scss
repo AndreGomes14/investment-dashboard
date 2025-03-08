@@ -1,15 +1,30 @@
-// src/styles.scss
 @use '@angular/material' as mat;
 
-// Use a prebuilt theme
-@import '@angular/material/prebuilt-themes/azure-blue.css';
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
 
-// Global styles
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  overflow-x: hidden;
+}
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
-// Add any other global styles
 .full-width {
+  width: 100%;
+}
+
+router-outlet {
+  display: none;
+}
+
+.mat-mdc-card {
+  margin: 0 !important;
+}
+
+.mat-mdc-form-field {
+  display: block;
   width: 100%;
 }
 

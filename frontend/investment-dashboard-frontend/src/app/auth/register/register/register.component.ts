@@ -1,10 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
-import { Router } from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../../services/auth.service';
 import { RegisterRequest } from '../../../model/auth.model';
-import { CommonModule } from '@angular/common';
+import {CommonModule, NgOptimizedImage} from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -26,7 +26,9 @@ import { ReactiveFormsModule } from '@angular/forms';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    NgOptimizedImage,
+    RouterLink
   ],
 })
 export class RegisterComponent implements OnInit {
@@ -95,7 +97,7 @@ export class RegisterComponent implements OnInit {
         this.snackBar.open('Registration successful! Welcome to Investment Dashboard.', 'Close', {
           duration: 5000
         });
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/dashboard']).then(r => r);
       },
       error: (error) => {
         this.isLoading = false;
