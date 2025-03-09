@@ -1,4 +1,5 @@
 export interface AuthResponse {
+  expiresIn: number;
   token: string;
   user: {
     id: number;

@@ -4,7 +4,7 @@ import {Router, RouterLink} from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../../services/auth.service';
 import { RegisterRequest } from '../../../model/auth.model';
-import {CommonModule, NgOptimizedImage} from '@angular/common';
+import {CommonModule} from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -12,6 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ReactiveFormsModule } from '@angular/forms';
+import {ErrorService} from '../../../services/error.service';
 
 @Component({
   selector: 'app-register',
@@ -27,7 +28,6 @@ import { ReactiveFormsModule } from '@angular/forms';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    NgOptimizedImage,
     RouterLink
   ],
 })
@@ -41,8 +41,9 @@ export class RegisterComponent implements OnInit {
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
-    private readonly snackBar: MatSnackBar
-  ) { }
+    private readonly snackBar: MatSnackBar,
+    private readonly errorService: ErrorService
+) { }
 
   ngOnInit(): void {
     this.initForm();
@@ -65,14 +66,11 @@ export class RegisterComponent implements OnInit {
       control.get('confirmPassword')?.setErrors({ passwordMismatch: true });
       return { passwordMismatch: true };
     } else {
-      // Remove the error if passwords match
       const confirmPasswordControl = control.get('confirmPassword');
       if (confirmPasswordControl?.hasError('passwordMismatch')) {
-        // Clone the errors without 'passwordMismatch'
         const errors = { ...confirmPasswordControl.errors };
         delete errors['passwordMismatch'];
 
-        // Set the new errors object, or null if there are no more errors
         confirmPasswordControl.setErrors(Object.keys(errors).length ? errors : null);
       }
       return null;
@@ -95,9 +93,10 @@ export class RegisterComponent implements OnInit {
       next: () => {
         this.isLoading = false;
         this.snackBar.open('Registration successful! Welcome to Investment Dashboard.', 'Close', {
-          duration: 5000
+          duration: 5000,
+          panelClass: ['success-snackbar']
         });
-        this.router.navigate(['/dashboard']).then(r => r);
+        this.router.navigate(['/dashboard']);
       },
       error: (error) => {
         this.isLoading = false;
