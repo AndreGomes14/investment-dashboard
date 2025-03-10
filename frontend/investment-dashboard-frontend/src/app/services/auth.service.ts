@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 })
 export class AuthService {
   // Make sure this matches the actual server path - we're removing 'api' here
-  private readonly API_URL = `/auth`;
+  private readonly API_URL = `/api/auth`;
   private readonly TOKEN_KEY = 'auth_data';
   private readonly currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
