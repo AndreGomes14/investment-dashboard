@@ -1,0 +1,245 @@
+<div class="investments-container">
+  <div class="page-header">
+    <h1>Investments Management</h1>
+    <p class="subtitle">Manage and optimize your investment portfolio</p>
+  </div>
+  
+  <div class="action-buttons">
+    <button mat-raised-button color="primary">
+      <mat-icon>add</mat-icon>
+      Add Investment
+    </button>
+    <button mat-raised-button color="accent">
+      <mat-icon>autorenew</mat-icon>
+      Rebalance Portfolio
+    </button>
+    <button mat-raised-button>
+      <mat-icon>download</mat-icon>
+      Export Data
+    </button>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title">Active Investments</h2>
+    
+    <mat-tab-group>
+      <mat-tab label="Stocks & ETFs">
+        <div class="investment-cards">
+          <mat-card class="investment-card">
+            <mat-card-header>
+              <div mat-card-avatar class="stock-avatar">TSLA</div>
+              <mat-card-title>Tesla, Inc.</mat-card-title>
+              <mat-card-subtitle>Technology - Electric Vehicles</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Current Price:</span>
+                  <span class="value">$780.45</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Shares Owned:</span>
+                  <span class="value">12</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Total Value:</span>
+                  <span class="value">$9,365.40</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Return:</span>
+                  <span class="value positive">+23.5%</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button color="primary">BUY MORE</button>
+              <button mat-button color="warn">SELL</button>
+              <button mat-button>DETAILS</button>
+            </mat-card-actions>
+          </mat-card>
+          
+          <mat-card class="investment-card">
+            <mat-card-header>
+              <div mat-card-avatar class="stock-avatar">AAPL</div>
+              <mat-card-title>Apple Inc.</mat-card-title>
+              <mat-card-subtitle>Technology - Consumer Electronics</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Current Price:</span>
+                  <span class="value">$152.75</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Shares Owned:</span>
+                  <span class="value">35</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Total Value:</span>
+                  <span class="value">$5,346.25</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Return:</span>
+                  <span class="value positive">+15.2%</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button color="primary">BUY MORE</button>
+              <button mat-button color="warn">SELL</button>
+              <button mat-button>DETAILS</button>
+            </mat-card-actions>
+          </mat-card>
+          
+          <mat-card class="investment-card">
+            <mat-card-header>
+              <div mat-card-avatar class="stock-avatar">VTI</div>
+              <mat-card-title>Vanguard Total Stock Market ETF</mat-card-title>
+              <mat-card-subtitle>ETF - US Equity</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Current Price:</span>
+                  <span class="value">$221.32</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Shares Owned:</span>
+                  <span class="value">43</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Total Value:</span>
+                  <span class="value">$9,516.76</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Return:</span>
+                  <span class="value positive">+8.7%</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button color="primary">BUY MORE</button>
+              <button mat-button color="warn">SELL</button>
+              <button mat-button>DETAILS</button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+      </mat-tab>
+      
+      <mat-tab label="Bonds & Fixed Income">
+        <div class="investment-cards">
+          <mat-card class="investment-card">
+            <mat-card-header>
+              <div mat-card-avatar class="bond-avatar">BND</div>
+              <mat-card-title>Vanguard Total Bond Market ETF</mat-card-title>
+              <mat-card-subtitle>Bond ETF - Diversified</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Current Price:</span>
+                  <span class="value">$82.48</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Shares Owned:</span>
+                  <span class="value">85</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Total Value:</span>
+                  <span class="value">$7,010.80</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Return:</span>
+                  <span class="value positive">+3.2%</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button color="primary">BUY MORE</button>
+              <button mat-button color="warn">SELL</button>
+              <button mat-button>DETAILS</button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+      </mat-tab>
+      
+      <mat-tab label="Alternative Investments">
+        <div class="investment-cards">
+          <mat-card class="investment-card">
+            <mat-card-header>
+              <div mat-card-avatar class="alt-avatar">REIT</div>
+              <mat-card-title>Vanguard Real Estate ETF</mat-card-title>
+              <mat-card-subtitle>REIT - Diversified</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Current Price:</span>
+                  <span class="value">$104.22</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Shares Owned:</span>
+                  <span class="value">32</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Total Value:</span>
+                  <span class="value">$3,335.04</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Return:</span>
+                  <span class="value negative">-1.8%</span>
+                </div>
+              </div>
+            </mat-card-content>
+            <mat-card-actions>
+              <button mat-button color="primary">BUY MORE</button>
+              <button mat-button color="warn">SELL</button>
+              <button mat-button>DETAILS</button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title">Investment Opportunities</h2>
+    <p class="section-subtitle">Suggestions based on your investment profile and market conditions</p>
+    
+    <div class="investment-cards">
+      <mat-card class="opportunity-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="opportunity-icon">trending_up</mat-icon>
+          <mat-card-title>Growth Opportunity</mat-card-title>
+          <mat-card-subtitle>Technology Sector ETF</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>This technology sector ETF could provide strong growth potential in your portfolio given the current market trends.</p>
+          <p><strong>Expected Return: </strong>15-20% annually</p>
+          <p><strong>Risk Level: </strong>Moderate-High</p>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-button color="primary">RESEARCH</button>
+          <button mat-button color="accent">INVEST NOW</button>
+        </mat-card-actions>
+      </mat-card>
+      
+      <mat-card class="opportunity-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="opportunity-icon">attach_money</mat-icon>
+          <mat-card-title>Income Strategy</mat-card-title>
+          <mat-card-subtitle>Dividend Aristocrats ETF</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>Companies with a history of consistent dividend increases can provide reliable income in various market conditions.</p>
+          <p><strong>Expected Return: </strong>8-10% annually</p>
+          <p><strong>Risk Level: </strong>Low-Moderate</p>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-button color="primary">RESEARCH</button>
+          <button mat-button color="accent">INVEST NOW</button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  </div>
+</div>

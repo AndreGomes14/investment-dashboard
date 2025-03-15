@@ -1,0 +1,166 @@
+<div class="portfolio-container">
+  <div class="page-header">
+    <h1>Portfolio Overview</h1>
+    <p class="subtitle">Your investment portfolio at a glance</p>
+  </div>
+
+  <div class="metrics-row">
+    <mat-card class="metric-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="metric-icon">account_balance</mat-icon>
+        <mat-card-title>Total Value</mat-card-title>
+        <mat-card-subtitle>Current Holdings</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <h2 class="metric-value">$185,750.00</h2>
+        <div class="metric-change positive">
+          <mat-icon>arrow_upward</mat-icon>
+          <span>+2.4% today</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="metric-icon">trending_up</mat-icon>
+        <mat-card-title>Total Gain/Loss</mat-card-title>
+        <mat-card-subtitle>Return on Investment</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <h2 class="metric-value">$23,450.00</h2>
+        <div class="metric-change positive">
+          <mat-icon>arrow_upward</mat-icon>
+          <span>+14.5% overall</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="metric-icon">pie_chart</mat-icon>
+        <mat-card-title>Asset Allocation</mat-card-title>
+        <mat-card-subtitle>Current Distribution</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="allocation-chart">
+          <div class="allocation-item" style="width: 65%; background-color: #3949ab;">
+            <span>Stocks: 65%</span>
+          </div>
+          <div class="allocation-item" style="width: 20%; background-color: #43a047;">
+            <span>Bonds: 20%</span>
+          </div>
+          <div class="allocation-item" style="width: 10%; background-color: #ff9800;">
+            <span>Cash: 10%</span>
+          </div>
+          <div class="allocation-item" style="width: 5%; background-color: #e53935;">
+            <span>Real Estate: 5%</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <div class="holdings-section">
+    <div class="section-header">
+      <h2>Your Holdings</h2>
+      <button mat-raised-button color="primary">
+        <mat-icon>add</mat-icon>
+        Add New Investment
+      </button>
+    </div>
+
+    <mat-card>
+      <div class="table-responsive">
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th>Type</th>
+              <th>Value</th>
+              <th>Allocation</th>
+              <th>Return</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Technology ETF</td>
+              <td>ETF</td>
+              <td>$65,000.00</td>
+              <td>35%</td>
+              <td class="positive">+22.4%</td>
+              <td>
+                <button mat-icon-button color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>S&P 500 Index Fund</td>
+              <td>Index Fund</td>
+              <td>$45,250.00</td>
+              <td>24%</td>
+              <td class="positive">+18.1%</td>
+              <td>
+                <button mat-icon-button color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>Corporate Bond Fund</td>
+              <td>Bond Fund</td>
+              <td>$37,500.00</td>
+              <td>20%</td>
+              <td class="positive">+5.2%</td>
+              <td>
+                <button mat-icon-button color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>High-Yield Savings</td>
+              <td>Cash</td>
+              <td>$18,000.00</td>
+              <td>10%</td>
+              <td class="positive">+2.8%</td>
+              <td>
+                <button mat-icon-button color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>Real Estate Fund</td>
+              <td>REIT</td>
+              <td>$20,000.00</td>
+              <td>11%</td>
+              <td class="negative">-1.5%</td>
+              <td>
+                <button mat-icon-button color="primary">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-card>
+  </div>
+</div>
