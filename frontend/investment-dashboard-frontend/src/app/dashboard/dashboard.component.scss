@@ -20,8 +20,8 @@ mat-sidenav-content {
 
 .sidenav {
   width: 280px;
-  background: linear-gradient(180deg, #172b4d 0%, #1a237e 100%);
-  color: white;
+  background: #1a237e;
+  color: #ffffff;
   border-right: none;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   transition: width 0.3s ease;
@@ -48,24 +48,24 @@ mat-sidenav-content {
   font-size: 52px;
   height: 52px;
   width: 52px;
-  color: white;
+  color: #ffffff;
   margin-bottom: 12px;
-  background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%);
+  background: #1a237e;
   border-radius: 16px;
   padding: 10px;
-  box-shadow: 0 4px 20px rgba(123, 31, 162, 0.4);
+  box-shadow: 0 4px 20px rgba(26, 35, 126, 0.4);
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 4px 20px rgba(123, 31, 162, 0.4);
+    box-shadow: 0 4px 20px rgba(26, 35, 126, 0.4);
   }
   50% {
-    box-shadow: 0 4px 30px rgba(123, 31, 162, 0.6);
+    box-shadow: 0 4px 30px rgba(26, 35, 126, 0.6);
   }
   100% {
-    box-shadow: 0 4px 20px rgba(123, 31, 162, 0.4);
+    box-shadow: 0 4px 20px rgba(26, 35, 126, 0.4);
   }
 }
 
@@ -74,13 +74,14 @@ mat-sidenav-content {
   margin-top: 0;
   letter-spacing: 0.5px;
   font-size: 20px;
+  color: #ffffff;
 }
 
 .toolbar {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: linear-gradient(90deg, #3949ab 0%, #1a237e 100%);
+  background: #1a237e;
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
   height: 64px;
 }
@@ -99,7 +100,7 @@ mat-sidenav-content {
 }
 
 mat-nav-list a {
-  color: rgba(255, 255, 255, 0.8);
+  color: #ffffff;
   transition: all 0.3s ease;
   border-left: 4px solid transparent;
   margin-bottom: 4px;
@@ -107,26 +108,41 @@ mat-nav-list a {
   margin-right: 8px;
 }
 
+mat-nav-list a span {
+  color: #ffffff;
+  font-weight: 400;
+}
+
 mat-nav-list a.active {
-  color: white;
+  color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
-  border-left: 4px solid #7b1fa2;
+  border-left: 4px solid #ffffff;
+  font-weight: 500;
+}
+
+mat-nav-list a.active span {
+  color: #ffffff;
   font-weight: 500;
 }
 
 mat-nav-list a:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   transform: translateX(4px);
+}
+
+mat-nav-list a:hover span {
+  color: #ffffff;
 }
 
 mat-nav-list mat-icon {
   margin-right: 16px;
+  color: #ffffff;
 }
 
 .logout-button {
   margin-top: auto;
-  color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
 }
 
 /* Responsive adjustments */

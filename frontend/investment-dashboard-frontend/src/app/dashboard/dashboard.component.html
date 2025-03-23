@@ -27,7 +27,11 @@
           <mat-icon>settings</mat-icon>
           <span>Account Settings</span>
         </a>
-        <mat-divider></mat-divider>
+        <a mat-list-item routerLink="/dashboard/ai-assistant" routerLinkActive="active">
+          <mat-icon>smart_toy</mat-icon>
+          <span>AI Assistant</span>
+        </a>
+        <div class="spacer"></div>
         <a mat-list-item (click)="logout()" class="logout-button">
           <mat-icon>exit_to_app</mat-icon>
           <span>Logout</span>

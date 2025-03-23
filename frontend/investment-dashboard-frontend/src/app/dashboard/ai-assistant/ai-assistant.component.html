@@ -1,0 +1,56 @@
+<div class="ai-assistant-container">
+  <div class="assistant-header">
+    <h1>AI Financial Assistant</h1>
+    <p class="subtitle">Powered by Claude AI</p>
+  </div>
+  
+  <div class="chat-container">
+    <div class="chat-messages" #chatMessages>
+      <div *ngFor="let message of messages" [ngClass]="{'message': true, 'user-message': message.role === 'user', 'assistant-message': message.role === 'assistant'}">
+        <div class="message-avatar">
+          <mat-icon *ngIf="message.role === 'user'">person</mat-icon>
+          <mat-icon *ngIf="message.role === 'assistant'">smart_toy</mat-icon>
+        </div>
+        <div class="message-content">
+          <div class="message-text" [innerHTML]="message.content"></div>
+          <div class="message-timestamp">{{ message.timestamp | date:'short' }}</div>
+        </div>
+      </div>
+      
+      <div *ngIf="isLoading" class="loading-indicator">
+        <div class="typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+    
+    <form [formGroup]="chatForm" (ngSubmit)="sendMessage()" class="chat-input-form">
+      <mat-form-field appearance="outline" class="message-input">
+        <input 
+          matInput 
+          formControlName="message" 
+          placeholder="Ask me about your investments..."
+          autocomplete="off"
+          [disabled]="isLoading">
+        <mat-error *ngIf="chatForm.get('message')?.hasError('required')">
+          Please enter a message
+        </mat-error>
+      </mat-form-field>
+      
+      <button 
+        mat-fab 
+        color="primary" 
+        type="submit" 
+        [disabled]="chatForm.invalid || isLoading">
+        <mat-icon>send</mat-icon>
+      </button>
+    </form>
+  </div>
+  
+  <div class="assistant-footer">
+    <p>The AI assistant provides information based on your portfolio data and general financial knowledge. 
+      For personalized advice, please consult with a financial advisor.</p>
+  </div>
+</div>

@@ -6,6 +6,7 @@ import { InvestmentsComponent } from './investments/investments.component';
 import { PlanningComponent } from './planning/planning.component';
 import { ReportsComponent } from './reports/reports.component';
 import { SettingsComponent } from './settings/settings.component';
+import { AiAssistantComponent } from './ai-assistant/ai-assistant.component';
 
 const routes: Routes = [
   {
@@ -36,6 +37,10 @@ const routes: Routes = [
       {
         path: 'settings',
         component: SettingsComponent
+      },
+      {
+        path: 'ai-assistant',
+        component: AiAssistantComponent
       }
     ]
   }

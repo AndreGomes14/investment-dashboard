@@ -1,8 +1,17 @@
 {
   "/api": {
-    "target": "http://localhost:8081",
+    "target": "http://localhost:8090",
     "secure": false,
     "logLevel": "debug",
     "changeOrigin": true
+  },
+  "/api/claude-ai": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "logLevel": "debug",
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/claude-ai": "/api/claude-ai"
+    }
   }
 }

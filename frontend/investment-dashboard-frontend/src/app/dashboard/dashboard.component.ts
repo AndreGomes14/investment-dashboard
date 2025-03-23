@@ -9,8 +9,31 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDialogModule, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { RouterModule } from '@angular/router';
 import { MatSidenav } from '@angular/material/sidenav';
+
+// Logout confirmation dialog component
+@Component({
+  selector: 'logout-confirmation-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatDialogModule, 
+    MatButtonModule
+  ],
+  template: `
+    <h2 mat-dialog-title>Confirm Logout</h2>
+    <mat-dialog-content>
+      <p>Are you sure you want to logout?</p>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close>Cancel</button>
+      <button mat-button [mat-dialog-close]="true" color="primary">Logout</button>
+    </mat-dialog-actions>
+  `
+})
+export class LogoutConfirmationDialog {}
 
 @Component({
   selector: 'app-dashboard',
@@ -24,6 +47,7 @@ import { MatSidenav } from '@angular/material/sidenav';
     MatListModule,
     MatDividerModule,
     MatMenuModule,
+    MatDialogModule,
     RouterModule
   ],
   templateUrl: './dashboard.component.html',
@@ -34,7 +58,11 @@ export class DashboardComponent implements OnInit {
   
   @ViewChild('sidenav') sidenav!: MatSidenav;
 
-  constructor(private readonly authService: AuthService, private readonly router: Router) {}
+  constructor(
+    private readonly authService: AuthService, 
+    private readonly router: Router,
+    private dialog: MatDialog
+  ) {}
 
   ngOnInit(): void {
     this.checkScreenSize();
@@ -50,7 +78,15 @@ export class DashboardComponent implements OnInit {
   }
 
   logout(): void {
-    this.authService.logout();
-    this.router.navigate(['/login']);
+    const dialogRef = this.dialog.open(LogoutConfirmationDialog, {
+      width: '300px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result === true) {
+        this.authService.logout();
+        this.router.navigate(['/login']);
+      }
+    });
   }
 }
