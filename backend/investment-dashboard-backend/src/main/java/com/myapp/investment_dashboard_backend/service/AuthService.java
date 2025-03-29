@@ -47,24 +47,9 @@ public class AuthService {
 
         userRepository.save(user);
 
-        // Generate JWT token
         String token = jwtTokenProvider.generateToken(user.getUsername());
-
-        // Create UserDTO (without sensitive info)
-        UserDTO userDTO = UserDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .createdAt(user.getCreatedAt())
-                .build();
-
-        // Return auth response
-        return AuthResponse.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .expiresIn(jwtTokenProvider.getExpirationTime() / 1000)
-                .user(userDTO)
-                .build();
+        UserDTO userDTO = createUserDTO(user);
+        return createAuthResponse(token, userDTO);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -83,18 +68,27 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Generate JWT token
         String token = jwtTokenProvider.generateToken(user.getUsername());
+        UserDTO userDTO = createUserDTO(user);
+        return createAuthResponse(token, userDTO);
+    }
 
-        // Create UserDTO (without sensitive info)
-        UserDTO userDTO = UserDTO.builder()
+    public User getCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private UserDTO createUserDTO(User user) {
+        return UserDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
 
-        // Return auth response
+    private AuthResponse createAuthResponse(String token, UserDTO userDTO) {
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
