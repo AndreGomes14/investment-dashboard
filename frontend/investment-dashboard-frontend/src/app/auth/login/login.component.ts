@@ -36,11 +36,11 @@ export class LoginComponent implements OnInit {
   hidePassword = true;
 
   constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router,
-    private snackBar: MatSnackBar,
-    private errorService: ErrorService
+    private readonly fb: FormBuilder,
+    private readonly authService: AuthService,
+    private readonly router: Router,
+    private readonly snackBar: MatSnackBar,
+    private readonly errorService: ErrorService
   ) { }
 
   ngOnInit(): void {
