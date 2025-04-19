@@ -29,17 +29,14 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // Check if username already exists
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new ResourceAlreadyExistsException("Username is already taken");
         }
 
-        // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ResourceAlreadyExistsException("Email is already in use");
         }
 
-        // Create new user
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -47,28 +44,10 @@ public class AuthService {
 
         userRepository.save(user);
 
-        // Generate JWT token
-        String token = jwtTokenProvider.generateToken(user.getUsername());
-
-        // Create UserDTO (without sensitive info)
-        UserDTO userDTO = UserDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .createdAt(user.getCreatedAt())
-                .build();
-
-        // Return auth response
-        return AuthResponse.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .expiresIn(jwtTokenProvider.getExpirationTime() / 1000)
-                .user(userDTO)
-                .build();
+        return buildAuthResponse(user);
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Authenticate user
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
@@ -76,17 +55,17 @@ public class AuthService {
                 )
         );
 
-        // Set authentication in security context
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Find user
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Generate JWT token
+        return buildAuthResponse(user);
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
         String token = jwtTokenProvider.generateToken(user.getUsername());
 
-        // Create UserDTO (without sensitive info)
         UserDTO userDTO = UserDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -94,7 +73,6 @@ public class AuthService {
                 .createdAt(user.getCreatedAt())
                 .build();
 
-        // Return auth response
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
