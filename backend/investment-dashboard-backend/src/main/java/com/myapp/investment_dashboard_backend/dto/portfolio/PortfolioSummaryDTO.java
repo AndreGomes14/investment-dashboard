@@ -7,13 +7,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class PortfolioSummaryDTO {
-    private Long portfolioId;
+    private UUID portfolioId;
     private String portfolioName;
     private BigDecimal totalValue;
     private BigDecimal totalPerformance;

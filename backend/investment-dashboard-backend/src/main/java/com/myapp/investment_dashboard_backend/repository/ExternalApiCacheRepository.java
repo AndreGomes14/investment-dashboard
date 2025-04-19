@@ -8,9 +8,10 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface ExternalApiCacheRepository extends JpaRepository<ExternalApiCache, Long> {
+public interface ExternalApiCacheRepository extends JpaRepository<ExternalApiCache, UUID> {
     Optional<ExternalApiCache> findByTickerAndType(String ticker, String type);
 
     @Query("SELECT DISTINCT e.ticker, e.type FROM ExternalApiCache e")

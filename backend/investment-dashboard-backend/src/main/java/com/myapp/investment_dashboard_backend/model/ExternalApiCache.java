@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "external_api_cache", uniqueConstraints = {
@@ -15,8 +16,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class ExternalApiCache {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(updatable = false, nullable = false, columnDefinition = "UUID")
+    private UUID id;
 
     @Column(nullable = false, length = 20)
     private String ticker;

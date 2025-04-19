@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
                 .getFieldErrors()
                 .stream()
                 .map(FieldError::getDefaultMessage)
-                .collect(Collectors.toList());
+                .toList();
 
         ApiResponse<Void> response = ApiResponse.error("Validation failed", errors);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
