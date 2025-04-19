@@ -2,12 +2,17 @@ package com.myapp.investment_dashboard_backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myapp.investment_dashboard_backend.exception.ResourceNotFoundException;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
 import com.myapp.investment_dashboard_backend.model.ExternalApiCache;
+import com.myapp.investment_dashboard_backend.model.User;
 import com.myapp.investment_dashboard_backend.repository.PortfolioRepository;
 import com.myapp.investment_dashboard_backend.repository.ExternalApiCacheRepository;
+import com.myapp.investment_dashboard_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
@@ -28,14 +33,16 @@ public class PortfolioService {
     private final ExternalApiCacheRepository externalApiCacheRepository;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final UserRepository userRepository;
     private static final Logger logger = LoggerFactory.getLogger(PortfolioService.class);
 
     @Autowired
-    public PortfolioService(PortfolioRepository portfolioRepository, ExternalApiCacheRepository externalApiCacheRepository, RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public PortfolioService(PortfolioRepository portfolioRepository, ExternalApiCacheRepository externalApiCacheRepository, RestTemplate restTemplate, ObjectMapper objectMapper, UserRepository userRepository) {
         this.portfolioRepository = portfolioRepository;
         this.externalApiCacheRepository = externalApiCacheRepository;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -48,7 +55,16 @@ public class PortfolioService {
         return portfolioRepository.findByIdWithInvestments(id);
     }
 
+    @Transactional
     public Portfolio createPortfolio(Portfolio portfolio) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + currentUsername));
+
+        portfolio.setUser(currentUser);
+
         return portfolioRepository.save(portfolio);
     }
 
@@ -124,10 +140,6 @@ public class PortfolioService {
     /**
      * Fetches the current value of a financial instrument from the external API.
      * This method should not be called directly, but only via getCurrentValue
-     * @param ticker
-     * @param type
-     * @return
-     * @throws IOException
      */
     private BigDecimal fetchCurrentValueFromAPI(String ticker, String type) throws IOException{
         String url = null;

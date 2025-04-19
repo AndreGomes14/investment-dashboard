@@ -103,5 +103,7 @@
     <orderEntry type="library" name="Maven: org.springframework.security:spring-security-core:6.1.5" level="project" />
     <orderEntry type="library" name="Maven: org.springframework.security:spring-security-crypto:6.1.5" level="project" />
     <orderEntry type="library" name="Maven: org.springframework:spring-tx:6.0.13" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.security:spring-security-config:6.1.5" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.security:spring-security-web:6.1.5" level="project" />
   </component>
 </module>
