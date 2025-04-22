@@ -31,4 +31,7 @@ public class ExternalApiCache {
 
     @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
+
+    @Column(name = "currency", length = 3)
+    private String currency;
 }

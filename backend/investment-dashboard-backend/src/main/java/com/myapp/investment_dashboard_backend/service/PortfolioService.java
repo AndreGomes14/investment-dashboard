@@ -1,26 +1,23 @@
 package com.myapp.investment_dashboard_backend.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
 import com.myapp.investment_dashboard_backend.exception.ResourceNotFoundException;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
-import com.myapp.investment_dashboard_backend.model.ExternalApiCache;
 import com.myapp.investment_dashboard_backend.model.User;
+import com.myapp.investment_dashboard_backend.model.UserSetting;
 import com.myapp.investment_dashboard_backend.repository.PortfolioRepository;
-import com.myapp.investment_dashboard_backend.repository.ExternalApiCacheRepository;
 import com.myapp.investment_dashboard_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,19 +27,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class PortfolioService {
 
     private final PortfolioRepository portfolioRepository;
-    private final ExternalApiCacheRepository externalApiCacheRepository;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
+    private final MarketDataService marketDataService;
+    private final CurrencyConversionService currencyConversionService;
     private static final Logger logger = LoggerFactory.getLogger(PortfolioService.class);
 
     @Autowired
-    public PortfolioService(PortfolioRepository portfolioRepository, ExternalApiCacheRepository externalApiCacheRepository, RestTemplate restTemplate, ObjectMapper objectMapper, UserRepository userRepository) {
+    public PortfolioService(PortfolioRepository portfolioRepository, UserRepository userRepository, MarketDataService marketDataService, CurrencyConversionService currencyConversionService) {
         this.portfolioRepository = portfolioRepository;
-        this.externalApiCacheRepository = externalApiCacheRepository;
-        this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
         this.userRepository = userRepository;
+        this.marketDataService = marketDataService;
+        this.currencyConversionService = currencyConversionService;
     }
 
     /**
@@ -56,184 +51,226 @@ public class PortfolioService {
     }
 
     @Transactional
-    public Portfolio createPortfolio(Portfolio portfolio) {
+    public Portfolio createPortfolio(String portfolioName) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
 
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + currentUsername));
 
+        Portfolio portfolio = new Portfolio();
+        portfolio.setName(portfolioName);
         portfolio.setUser(currentUser);
+        portfolio.setTotalValue(BigDecimal.ZERO);
 
         return portfolioRepository.save(portfolio);
     }
 
+    public List<Portfolio> getPortfoliosByCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + currentUsername));
+
+        return portfolioRepository.findByUserId(currentUser.getId());
+    }
+
     /**
-     * Calculates the total value of a portfolio based on its investments.
-     * This method fetches the current price of each investment, multiplies it
-     * by the quantity held, and sums the values.
+     * Calculates the total value of a portfolio converted to the user's preferred currency.
      *
-     * @param portfolio The portfolio for which to calculate the total value.
-     * @return The total value of the portfolio, or null in case of error.
+     * @param portfolio The portfolio object.
+     * @param user The user whose preferred currency will be used.
+     * @return The total value as BigDecimal in the user's preferred currency, or null if calculation fails.
      */
-    public BigDecimal calculatePortfolioValue(Portfolio portfolio) {
-        BigDecimal totalValue = BigDecimal.ZERO;
-        if (portfolio == null || portfolio.getInvestments() == null) {
-            return totalValue;
+    public BigDecimal calculatePortfolioValueInPreferredCurrency(Portfolio portfolio, User user) {
+        if (user == null) {
+            logger.error("Cannot calculate value in preferred currency: User object is null.");
+            return null;
         }
+
+        String preferredCurrency = user.getSettings().stream() // <- If user.getSettings() is null, this throws NPE
+                .filter(s -> "preferredCurrency".equals(s.getKey()))
+                .map(UserSetting::getValue)
+                .findFirst()
+                .orElse("USD");
+        logger.debug("Calculating total value for portfolio {} in user {}'s preferred currency: {}",
+                portfolio != null ? portfolio.getId() : "null", user.getUsername(), preferredCurrency);
+
+        if (portfolio == null || portfolio.getInvestments() == null) {
+            logger.warn("calculatePortfolioValueInPreferredCurrency called with null portfolio or investments.");
+            return BigDecimal.ZERO; // Return zero if no investments
+        }
+
+        BigDecimal totalValueInPreferredCurrency = BigDecimal.ZERO;
 
         for (Investment investment : portfolio.getInvestments()) {
+            if (investment.getTicker() == null || investment.getType() == null ||
+                    investment.getCurrency() == null || investment.getCurrency().trim().isEmpty() ||
+                    investment.getAmount() == null) {
+                logger.warn("Skipping investment ID {} for total value calculation due to missing info.", investment.getId());
+                continue;
+            }
+
             try {
-                BigDecimal currentValue = getCurrentValue(investment.getTicker(), investment.getType()); // Use getType()
-                if (currentValue != null) {
-                    BigDecimal investmentValue = currentValue.multiply(new BigDecimal(String.valueOf(investment.getAmount()))); // Use amount
-                    totalValue = totalValue.add(investmentValue);
+                PriceInfo priceInfo = marketDataService.getCurrentValue(
+                        investment.getTicker(),
+                        investment.getType(),
+                        investment.getCurrency()
+                );
+
+                if (priceInfo != null && priceInfo.value() != null && priceInfo.currency() != null) {
+                    if (!priceInfo.currency().equalsIgnoreCase(investment.getCurrency())) {
+                        logger.error("Currency mismatch for investment {}: expected {}, but MarketDataService returned {}. Skipping for total value.",
+                                investment.getId(), investment.getCurrency(), priceInfo.currency());
+                        continue;
+                    }
+
+                    BigDecimal holdingValue = priceInfo.value().multiply(investment.getAmount());
+                    String sourceCurrency = priceInfo.currency().toUpperCase();
+
+                    // Convert to preferred currency if necessary
+                    BigDecimal valueInPreferredCurrency;
+                    if (sourceCurrency.equalsIgnoreCase(preferredCurrency)) {
+                        valueInPreferredCurrency = holdingValue;
+                    } else {
+                        logger.debug("Converting investment {} ({}) value from {} to {}",
+                                investment.getId(), investment.getTicker(), sourceCurrency, preferredCurrency);
+                        valueInPreferredCurrency = currencyConversionService.convert(holdingValue, sourceCurrency, preferredCurrency);
+                    }
+
+                    if (valueInPreferredCurrency != null) {
+                        totalValueInPreferredCurrency = totalValueInPreferredCurrency.add(valueInPreferredCurrency);
+                    } else {
+                        logger.error("Failed to convert value for investment {} ({}) from {} to {}. Skipping for total value.",
+                                investment.getId(), investment.getTicker(), sourceCurrency, preferredCurrency);
+                        return null;
+                    }
+
                 } else {
-                    logger.warn("Could not retrieve current value for {} - {}. Skipping.", investment.getType(), investment.getTicker());
+                    logger.warn("Could not retrieve valid PriceInfo for investment {} ({}-{}). Skipping for total value.",
+                            investment.getId(), investment.getType(), investment.getTicker());
                     return null;
                 }
+            } catch (IOException e) {
+                logger.error("IOException calculating value for investment {} ({}-{}) in portfolio {}: {}. Cannot calculate total value.",
+                        investment.getId(), investment.getType(), investment.getTicker(), portfolio.getId(), e.getMessage());
+                return null;
             } catch (Exception e) {
-                logger.error("Error calculating value for investment {} in portfolio {}: {}", investment.getId(), portfolio.getId(), e.getMessage());
-                return null; // Return null in case of error.
-            }
-        }
-        return totalValue.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Retrieves the current value of a financial instrument (stock, ETF, crypto)
-     * from an external API or the local cache.  Currently supports Yahoo Finance
-     * for stocks/ETFs and CoinGecko for cryptocurrencies.
-     *
-     * @param ticker The ticker symbol of the financial instrument.
-     * @param type   The type of asset (e.g., "stock", "crypto").  Use the field name "type"
-     * @return The current value of the instrument, or null if the value cannot be retrieved.
-     * @throws IOException if there is an error parsing the JSON response.
-     */
-    private BigDecimal getCurrentValue(String ticker, String type) throws IOException {
-        // First, check the cache
-        Optional<ExternalApiCache> cacheEntry = externalApiCacheRepository.findByTickerAndType(ticker, type); // Use type
-        if (cacheEntry.isPresent()) {
-            ExternalApiCache cache = cacheEntry.get();
-            // Only return the cached value if it's recent enough (e.g., within 5 minutes)
-            if (cache.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(5))) {
-                return cache.getCurrentValue();
-            }
-            // Remove the outdated cache entry
-            externalApiCacheRepository.delete(cache);
-        }
-
-        // If not in cache or outdated, fetch from external API
-        BigDecimal currentValue = fetchCurrentValueFromAPI(ticker, type); // Use type
-        if (currentValue != null) {
-            // Update the cache
-            ExternalApiCache newCacheEntry = new ExternalApiCache();
-            newCacheEntry.setTicker(ticker);
-            newCacheEntry.setType(type); // Use type
-            newCacheEntry.setCurrentValue(currentValue);
-            newCacheEntry.setLastUpdated(LocalDateTime.now());
-            externalApiCacheRepository.save(newCacheEntry);
-        }
-        return currentValue;
-    }
-
-    /**
-     * Fetches the current value of a financial instrument from the external API.
-     * This method should not be called directly, but only via getCurrentValue
-     */
-    private BigDecimal fetchCurrentValueFromAPI(String ticker, String type) throws IOException{
-        String url = null;
-        JsonNode root = null;
-
-        try {
-            if ("stock".equalsIgnoreCase(type) || "etf".equalsIgnoreCase(type)) {
-                // Yahoo Finance API URL
-                url = "https://query1.finance.yahoo.com/v8/finance/chart/" + ticker;
-                String response = restTemplate.getForObject(url, String.class);
-                root = objectMapper.readTree(response);
-                // Navigate the JSON structure to find the price.
-                JsonNode resultNode = root.path("chart").path("result").get(0);
-                if (resultNode.isMissingNode()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode indicatorsNode = resultNode.path("indicators");
-                if(indicatorsNode.isMissingNode()){
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode quoteNode = indicatorsNode.path("quote").get(0);
-
-                if (quoteNode.isMissingNode()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode closeNode = quoteNode.path("close").get(0);
-                if (closeNode.isMissingNode() || closeNode.isNull()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                double price = closeNode.asDouble();
-                return BigDecimal.valueOf(price);
-            } else if ("crypto".equalsIgnoreCase(type)) {
-                // CoinGecko API URL
-                url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ticker + "&vs_currencies=usd";
-                String response = restTemplate.getForObject(url, String.class);
-                root = objectMapper.readTree(response);
-                // CoinGecko returns a JSON object with the ticker as the key.
-                JsonNode priceNode = root.path(ticker.toLowerCase()).path("usd");
-                if (priceNode.isMissingNode()) {
-                    logger.warn("Could not find price for crypto ticker: {} in CoinGecko response", ticker);
-                    return null; // Handle the case where the ticker is not found
-                }
-                double price = priceNode.asDouble();
-                return BigDecimal.valueOf(price);
-            } else {
-                logger.warn("Unsupported asset type: {}", type);
+                logger.error("Unexpected error calculating value for investment {} ({}-{}) in portfolio {}: {}. Cannot calculate total value.",
+                        investment.getId(), investment.getType(), investment.getTicker(), portfolio.getId(), e.getMessage());
                 return null;
             }
-        } catch (IOException e) {
-            logger.error("Error fetching/parsing data for {} from {}: {}", ticker, url, e.getMessage());
-            throw e; // Re-throw the exception so it's handled in the controller.
-        } catch (Exception e) {
-            logger.error("Unexpected error fetching data for {} from {}: {}", ticker, url, e.getMessage());
+        }
+
+        return totalValueInPreferredCurrency.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Updates the values of all investments and recalculates the total portfolio value
+     * in the owner's preferred currency.
+     *
+     * @param portfolioId The ID of the portfolio to update.
+     * @return The updated portfolio with the new total value, or null if the update fails.
+     */
+    @Transactional
+    public Portfolio updatePortfolioValues(UUID portfolioId) {
+        Optional<Portfolio> portfolioOptional = portfolioRepository.findByIdWithInvestments(portfolioId);
+        if (portfolioOptional.isPresent()) {
+            Portfolio portfolio = portfolioOptional.get();
+            User owner = portfolio.getUser(); // Get the owner to find preferred currency
+            if (owner == null) {
+                logger.error("Portfolio {} has no associated user. Cannot update total value correctly.", portfolioId);
+                return null;
+            }
+
+            boolean individualUpdateFailed = false;
+            for (Investment investment : portfolio.getInvestments()) {
+                if (investment.getTicker() == null || investment.getType() == null || investment.getCurrency() == null) {
+                    logger.warn("Skipping update for investment ID {} due to missing ticker, type, or currency.", investment.getId());
+                    continue;
+                }
+                try {
+                    PriceInfo priceInfo = marketDataService.getCurrentValue(
+                            investment.getTicker(), investment.getType(), investment.getCurrency());
+                    if (priceInfo != null && priceInfo.value() != null) {
+                        investment.setCurrentValue(priceInfo.value());
+                        investment.setLastUpdateDate(LocalDateTime.now());
+                    } else {
+                        logger.warn("Failed to update current value for investment {} ({}-{}) in portfolio {}. Current value will remain unchanged.",
+                                investment.getId(), investment.getType(), investment.getTicker(), portfolioId);
+                        individualUpdateFailed = true;
+                    }
+                } catch (IOException e) {
+                    logger.error("IOException updating individual investment value for {} ({}-{}): {}. Skipping update.",
+                            investment.getId(), investment.getType(), investment.getTicker(), e.getMessage());
+                    individualUpdateFailed = true;
+                } catch (Exception e) {
+                    logger.error("Unexpected error updating individual investment value for {} ({}-{}): {}. Skipping update.",
+                            investment.getId(), investment.getType(), investment.getTicker(), e.getMessage());
+                    individualUpdateFailed = true;
+                }
+            }
+
+            BigDecimal newTotalValue = calculatePortfolioValueInPreferredCurrency(portfolio, owner);
+
+            if (newTotalValue != null) {
+                portfolio.setTotalValue(newTotalValue); // Update the single totalValue field
+                Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+                Set<UserSetting> ownerSettings = owner.getSettings();
+                String loggedPreferredCurrency = (ownerSettings != null)
+                        ? ownerSettings.stream()
+                        .filter(s -> s != null && "preferredCurrency".equals(s.getKey()))
+                        .map(UserSetting::getValue)
+                        .filter(java.util.Objects::nonNull)
+                        .findFirst()
+                        .orElse("USD")
+                        : "USD";
+
+                logger.info("Successfully updated portfolio {} total value to {} {}",
+                        portfolioId,
+                        newTotalValue,
+                        loggedPreferredCurrency);
+
+                if (individualUpdateFailed) {
+                    logger.warn("Portfolio {} total value updated, but one or more individual investment value updates failed.", portfolioId);
+                }
+                return savedPortfolio;
+            } else {
+                logger.error("Failed to calculate new total value in preferred currency for portfolio {}. Total value not updated.", portfolioId);
+                return null;
+            }
+        } else {
+            logger.warn("Attempted to update values for non-existent portfolio: {}", portfolioId);
             return null;
         }
     }
 
     /**
-     * Updates the values of all investments in a portfolio and recalculates the
-     * portfolio value.
+     * Deletes a portfolio by its ID after verifying ownership.
      *
-     * @param portfolioId The ID of the portfolio to update.
-     * @return The updated portfolio with the new total value, or null if the update fails.
+     * @param portfolioId The ID of the portfolio to delete.
+     * @throws ResourceNotFoundException if the portfolio does not exist.
+     * @throws AccessDeniedException if the current user does not own the portfolio.
      */
-    @Transactional // Add transactional annotation
-    public Portfolio updatePortfolioValues(UUID portfolioId) {
-        Optional<Portfolio> portfolioOptional = portfolioRepository.findByIdWithInvestments(portfolioId);
-        if (portfolioOptional.isPresent()) {
-            Portfolio portfolio = portfolioOptional.get();
-            BigDecimal newTotalValue = calculatePortfolioValue(portfolio);
-            if (newTotalValue != null) {
-                portfolio.setTotalValue(newTotalValue);
-                for (Investment investment : portfolio.getInvestments()) {
-                    try {
-                        BigDecimal currentValue = getCurrentValue(investment.getTicker(), investment.getType()); // Use type
-                        if (currentValue != null) {
-                            investment.setCurrentValue(currentValue);
-                            investment.setLastUpdateDate(LocalDateTime.now());
-                        }
-                    } catch (IOException e) {
-                        logger.error("Error updating investment value: {}", e.getMessage());
-                        return null; // Or handle the error as appropriate for your application
-                    }
-                }
-                return portfolioRepository.save(portfolio);
-            } else {
-                return null;
-            }
+    @Transactional
+    public void deletePortfolio(UUID portfolioId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + currentUsername));
+
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
+
+        if (!portfolio.getUser().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("User does not have permission to delete this portfolio");
         }
-        return null;
+
+        portfolioRepository.delete(portfolio);
+        logger.info("Portfolio with id {} deleted successfully by user {}", portfolioId, currentUsername);
     }
 }
 

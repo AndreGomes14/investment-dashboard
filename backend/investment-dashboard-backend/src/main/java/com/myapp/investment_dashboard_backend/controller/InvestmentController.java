@@ -1,8 +1,13 @@
 
 package com.myapp.investment_dashboard_backend.controller;
 
+import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.mapper.InvestmentMapper;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import jakarta.validation.Valid;
+import org.hibernate.sql.Update;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,10 +22,11 @@ import java.util.UUID;
 public class InvestmentController {
 
     private final InvestmentService investmentService;
+    private final InvestmentMapper investmentMapper;
 
-    @Autowired
-    public InvestmentController(InvestmentService investmentService) {
+    InvestmentController(InvestmentService investmentService, InvestmentMapper investmentMapper) {
         this.investmentService = investmentService;
+        this.investmentMapper = investmentMapper;
     }
 
     /**
@@ -48,31 +54,11 @@ public class InvestmentController {
 
     /**
      * Creates a new investment.
-     *
-     * @param investment The investment object to create.
-     * @return ResponseEntity containing the created investment.
      */
     @PostMapping
-    public ResponseEntity<Investment> createInvestment(@RequestBody Investment investment) {
-        Investment createdInvestment = investmentService.createInvestment(investment);
+    public ResponseEntity<Investment> createInvestment(@Valid @RequestBody CreateInvestmentRequest request) {
+        Investment createdInvestment = investmentService.createInvestment(request);
         return new ResponseEntity<>(createdInvestment, HttpStatus.CREATED);
-    }
-
-    /**
-     * Updates an existing investment.
-     *
-     * @param id           The ID of the investment to update.
-     * @param investment The updated investment object.
-     * @return ResponseEntity containing the updated investment, or NOT_FOUND if the investment does not exist.
-     */
-    @PutMapping("/{id}")
-    public ResponseEntity<Investment> updateInvestment(@PathVariable UUID id, @RequestBody Investment investment) {
-        Investment updatedInvestment = investmentService.updateInvestment(id, investment);
-        if (updatedInvestment != null) {
-            return new ResponseEntity<>(updatedInvestment, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
     }
 
     /**
@@ -85,37 +71,5 @@ public class InvestmentController {
     public ResponseEntity<Void> deleteInvestment(@PathVariable UUID id) {
         investmentService.deleteInvestment(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-    }
-
-    /**
-     * Retrieves the current value of an investment.
-     *
-     * @param id The ID of the investment.
-     * @return ResponseEntity containing the current value, or NOT_FOUND if the investment does not exist, or INTERNAL_SERVER_ERROR if the value cannot be retrieved.
-     */
-    @GetMapping("/{id}/current-value")
-    public ResponseEntity<BigDecimal> getInvestmentCurrentValue(@PathVariable UUID id) {
-        BigDecimal currentValue = investmentService.getInvestmentCurrentValue(id);
-        if (currentValue != null) {
-            return new ResponseEntity<>(currentValue, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or NOT_FOUND if investment doesn't exist
-        }
-    }
-
-    /**
-     * Updates the current value of an investment.
-     *
-     * @param id The ID of the investment to update.
-     * @return ResponseEntity containing the updated investment, or NOT_FOUND if the investment does not exist, or INTERNAL_SERVER_ERROR if the update fails.
-     */
-    @PutMapping("/{id}/current-value")
-    public ResponseEntity<Investment> updateInvestmentValue(@PathVariable UUID id) {
-        Investment updatedInvestment = investmentService.updateInvestmentValue(id);
-        if (updatedInvestment != null) {
-            return new ResponseEntity<>(updatedInvestment, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); //  Or NOT_FOUND
-        }
     }
 }

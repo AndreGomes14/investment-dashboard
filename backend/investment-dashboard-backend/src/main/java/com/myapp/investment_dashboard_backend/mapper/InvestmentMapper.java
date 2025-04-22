@@ -1,5 +1,6 @@
 package com.myapp.investment_dashboard_backend.mapper;
 
+import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.investment.InvestmentDTO;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
@@ -18,6 +19,8 @@ public abstract class InvestmentMapper {
     @Mapping(source = "portfolio.id", target = "portfolioId")
     @Mapping(target = "performance", ignore = true)
     public abstract InvestmentDTO toDto(Investment investment);
+
+    public abstract Investment toEntity(CreateInvestmentRequest investmentRequest);
 
     public abstract List<InvestmentDTO> toDtoList(List<Investment> investments);
 

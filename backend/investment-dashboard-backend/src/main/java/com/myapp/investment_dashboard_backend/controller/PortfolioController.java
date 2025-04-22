@@ -1,12 +1,18 @@
 package com.myapp.investment_dashboard_backend.controller;
 
+import com.myapp.investment_dashboard_backend.dto.portfolio.CreatePortfolioRequest;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
+import com.myapp.investment_dashboard_backend.model.User;
 import com.myapp.investment_dashboard_backend.service.PortfolioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,16 +38,16 @@ public class PortfolioController {
         Optional<Portfolio> portfolio = portfolioService.getPortfolioByIdWithInvestments(id);
         return portfolio.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
+
     /**
      * Creates a new portfolio.
      *
-     * @param portfolio The portfolio object to create.
+     * @param request DTO containing portfolio creation details (e.g., name).
      * @return ResponseEntity containing the created portfolio and HTTP status.
      */
-
     @PostMapping
-    public ResponseEntity<Portfolio> createPortfolio(@RequestBody Portfolio portfolio) {
-        Portfolio createdPortfolio = portfolioService.createPortfolio(portfolio);
+    public ResponseEntity<Portfolio> createPortfolio(@RequestBody CreatePortfolioRequest request) {
+        Portfolio createdPortfolio = portfolioService.createPortfolio(request.getName());
         return new ResponseEntity<>(createdPortfolio, HttpStatus.CREATED);
     }
 
@@ -57,31 +63,62 @@ public class PortfolioController {
         if (updatedPortfolio != null) {
             return new ResponseEntity<>(updatedPortfolio, HttpStatus.OK);
         } else {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or HttpStatus.NOT_FOUND if portfolio not found
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Calculates the current total value of a portfolio.
+     * Calculates the current total value of a portfolio in the owner's preferred currency.
      *
      * @param id The ID of the portfolio to calculate the value for.
-     * @return ResponseEntity containing the total value and HTTP status.
+     * @return ResponseEntity containing the total value (BigDecimal) in the preferred currency,
+     *         or relevant error status (404, 403, 500).
      */
     @GetMapping("/{id}/value")
-    public ResponseEntity<BigDecimal> getPortfolioValue(@PathVariable UUID id) {
+    public ResponseEntity<BigDecimal> getPortfolioValueInPreferredCurrency(@PathVariable UUID id) {
         Optional<Portfolio> portfolioOptional = portfolioService.getPortfolioByIdWithInvestments(id);
-        if (portfolioOptional.isPresent()) {
-            Portfolio portfolio = portfolioOptional.get();
-            BigDecimal totalValue = portfolioService.calculatePortfolioValue(portfolio);
-            if (totalValue != null) {
-                return new ResponseEntity<>(totalValue, HttpStatus.OK);
-            }
-            else{
-                return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        } else {
+
+        if (portfolioOptional.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
+
+        Portfolio portfolio = portfolioOptional.get();
+        User owner = portfolio.getUser();
+
+        if (owner == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Portfolio owner information missing.");
+        }
+
+        BigDecimal totalValue = portfolioService.calculatePortfolioValueInPreferredCurrency(portfolio, owner);
+
+        if (totalValue != null) {
+            return ResponseEntity.ok(totalValue);
+        } else {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Retrieves all portfolios for the currently authenticated user.
+     *
+     * @return ResponseEntity containing a list of portfolios and HTTP status.
+     */
+    @GetMapping
+    public ResponseEntity<List<Portfolio>> getCurrentUserPortfolios() {
+        List<Portfolio> portfolios = portfolioService.getPortfoliosByCurrentUser();
+        return ResponseEntity.ok(portfolios);
+    }
+
+    /**
+     * Deletes a portfolio by its ID.
+     *
+     * @param id The ID of the portfolio to delete.
+     * @return ResponseEntity with HTTP status (e.g., 204 No Content, 404 Not Found, 403 Forbidden).
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePortfolio(@PathVariable UUID id) {
+        portfolioService.deletePortfolio(id);
+        return ResponseEntity.noContent().build();
     }
 }
 

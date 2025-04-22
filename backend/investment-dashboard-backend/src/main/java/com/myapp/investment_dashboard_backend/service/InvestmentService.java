@@ -2,9 +2,17 @@ package com.myapp.investment_dashboard_backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
+import com.myapp.investment_dashboard_backend.exception.ResourceNotFoundException;
 import com.myapp.investment_dashboard_backend.model.Investment;
+import com.myapp.investment_dashboard_backend.model.Portfolio;
 import com.myapp.investment_dashboard_backend.repository.InvestmentRepository;
+import com.myapp.investment_dashboard_backend.repository.PortfolioRepository;
+import com.myapp.investment_dashboard_backend.utils.StatusInvestment;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
@@ -24,17 +32,15 @@ import com.myapp.investment_dashboard_backend.repository.ExternalApiCacheReposit
 public class InvestmentService {
 
     private final InvestmentRepository investmentRepository;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
-    private final ExternalApiCacheRepository externalApiCacheRepository;
+    private final MarketDataService marketDataService;
     private static final Logger logger = LoggerFactory.getLogger(InvestmentService.class);
+    private final PortfolioRepository portfolioRepository;
 
     @Autowired
-    public InvestmentService(InvestmentRepository investmentRepository, RestTemplate restTemplate, ObjectMapper objectMapper, ExternalApiCacheRepository externalApiCacheRepository) {
+    public InvestmentService(InvestmentRepository investmentRepository, MarketDataService marketDataService, PortfolioRepository portfolioRepository) {
         this.investmentRepository = investmentRepository;
-        this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
-        this.externalApiCacheRepository = externalApiCacheRepository;
+        this.marketDataService = marketDataService;
+        this.portfolioRepository = portfolioRepository;
     }
 
     /**
@@ -49,36 +55,59 @@ public class InvestmentService {
 
     /**
      * Creates a new investment.
-     *
-     * @param investment The investment object to create.
-     * @return The created investment.
      */
-    public Investment createInvestment(Investment investment) {
-        investment.setLastUpdateDate(LocalDateTime.now()); // Set initial last update
+    @Transactional
+    public Investment createInvestment(CreateInvestmentRequest request) {
+        Portfolio portfolio = portfolioRepository.findById(request.getPortfolioId())
+                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + request.getPortfolioId()));
+
+        Investment investment = new Investment();
+        investment.setPortfolio(portfolio);
+        investment.setTicker(request.getTicker());
+        investment.setType(request.getType());
+        investment.setAmount(request.getAmount());
+        investment.setPurchasePrice(request.getPurchasePrice());
+        investment.setCurrency(request.getCurrency().toUpperCase());
+        investment.setStatus(StatusInvestment.ACTIVE);
+        investment.setLastUpdateDate(LocalDateTime.now());
+
+        logger.info("Creating new investment: Ticker={}, Type={}, Amount={}, Price={}, Currency={}, PortfolioID={}",
+                investment.getTicker(), investment.getType(), investment.getAmount(), investment.getPurchasePrice(), investment.getCurrency(), portfolio.getId());
+
         return investmentRepository.save(investment);
     }
 
     /**
-     * Updates an existing investment.
+     * Updates an existing investment based on data from a DTO.
      *
-     * @param id           The ID of the investment to update.
-     * @param updatedInvestment The updated investment object.
-     * @return The updated investment, or null if the investment does not exist.
+     * @param id      The ID of the investment to update.
+     * @param request The DTO containing the update details.
+     * @return The updated investment entity.
+     * @throws ResourceNotFoundException if the investment with the given ID is not found.
      */
     @Transactional
-    public Investment updateInvestment(UUID id, Investment updatedInvestment) {
-        Optional<Investment> existingInvestment = investmentRepository.findById(id);
-        if (existingInvestment.isPresent()) {
-            Investment investment = existingInvestment.get();
-            investment.setTicker(updatedInvestment.getTicker());
-            investment.setType(updatedInvestment.getType());
-            investment.setAmount(updatedInvestment.getAmount());
-            investment.setPurchasePrice(updatedInvestment.getPurchasePrice());
-            investment.setLastUpdateDate(LocalDateTime.now()); // update
-            investment.setStatus(updatedInvestment.getStatus());
-            return investmentRepository.save(investment);
+    public Investment updateInvestment(UUID id, UpdateInvestmentRequest request) {
+        Investment investment = investmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Investment not found with id: " + id));
+
+        if (request.getTicker() != null) {
+            investment.setTicker(request.getTicker());
         }
-        return null;
+        if (request.getType() != null) {
+            investment.setType(request.getType());
+        }
+        if (request.getAmount() != null) {
+            investment.setAmount(request.getAmount());
+        }
+        if (request.getPurchasePrice() != null) {
+            investment.setPurchasePrice(request.getPurchasePrice());
+        }
+        investment.setLastUpdateDate(LocalDateTime.now()); // Manually set for consistency if needed, though @UpdateTimestamp might suffice
+
+        logger.info("Updating investment {}: Ticker={}, Type={}, Amount={}, Price={}",
+                id, investment.getTicker(), investment.getType(), investment.getAmount(), investment.getPurchasePrice());
+
+        return investmentRepository.save(investment);
     }
 
     /**
@@ -100,28 +129,39 @@ public class InvestmentService {
     }
 
     /**
-     * Gets the current value of the investment.
-     *
-     * @param investmentId
-     * @return
+     * Gets the current value of the investment by calling MarketDataService.
      */
     public BigDecimal getInvestmentCurrentValue(UUID investmentId) {
         Optional<Investment> investmentOptional = investmentRepository.findById(investmentId);
         if (investmentOptional.isPresent()) {
             Investment investment = investmentOptional.get();
-            try {
-                return getCurrentValue(investment.getTicker(), investment.getType());
-            } catch (IOException e) {
-                logger.error("Error fetching current value for investment {}: {}", investmentId, e.getMessage());
+            if (investment.getCurrency() == null || investment.getCurrency().trim().isEmpty()) {
+                logger.warn("Investment {} is missing currency information. Cannot fetch current value.", investmentId);
                 return null;
             }
-
+            try {
+                PriceInfo priceInfo = marketDataService.getCurrentValue(
+                        investment.getTicker(),
+                        investment.getType(),
+                        investment.getCurrency()
+                );
+                // Return the value from PriceInfo, if available
+                return (priceInfo != null) ? priceInfo.value() : null;
+            } catch (IOException e) {
+                logger.error("IOException fetching current value for investment {}: {}", investmentId, e.getMessage());
+                return null;
+            } catch (Exception e) {
+                logger.error("Unexpected error fetching current value for investment {}: {}", investmentId, e.getMessage());
+                return null;
+            }
+        } else {
+            logger.warn("Attempted to get current value for non-existent investment: {}", investmentId);
+            return null;
         }
-        return null;
     }
 
     /**
-     * Updates the current value of an investment.
+     * Updates the current value of an investment using MarketDataService.
      *
      * @param id The ID of the investment to update.
      * @return The updated investment, or null if the investment does not exist or the update fails.
@@ -131,114 +171,34 @@ public class InvestmentService {
         Optional<Investment> investmentOptional = investmentRepository.findById(id);
         if (investmentOptional.isPresent()) {
             Investment investment = investmentOptional.get();
+            if (investment.getCurrency() == null || investment.getCurrency().trim().isEmpty()) {
+                logger.warn("Investment {} is missing currency information. Cannot update current value.", id);
+                return null;
+            }
             try {
-                BigDecimal currentValue = getCurrentValue(investment.getTicker(), investment.getType());
-                if (currentValue != null) {
-                    investment.setCurrentValue(currentValue);
+                PriceInfo priceInfo = marketDataService.getCurrentValue(
+                        investment.getTicker(),
+                        investment.getType(),
+                        investment.getCurrency()
+                );
+
+                if (priceInfo != null && priceInfo.value() != null) {
+                    investment.setCurrentValue(priceInfo.value());
                     investment.setLastUpdateDate(LocalDateTime.now());
                     return investmentRepository.save(investment);
+                } else {
+                    logger.warn("Failed to retrieve valid current value PriceInfo for investment {} ({}). Update aborted.", id, investment.getTicker());
+                    return null;
                 }
             } catch (IOException e) {
-                logger.error("Error updating current value for investment {}: {}", id, e.getMessage());
+                logger.error("IOException updating current value for investment {}: {}", id, e.getMessage());
+                return null;
+            } catch (Exception e) {
+                logger.error("Unexpected error updating current value for investment {}: {}", id, e.getMessage());
                 return null;
             }
-        }
-        return null;
-    }
-
-    /**
-     * Retrieves the current value of a financial instrument (stock, ETF, crypto)
-     * from an external API.  Currently supports Yahoo Finance for stocks/ETFs
-     * and CoinGecko for cryptocurrencies.
-     *
-     * @param ticker The ticker symbol of the financial instrument.
-     * @param type   The type of asset (e.g., "stock", "crypto").
-     * @return The current value of the instrument, or null if the value cannot be retrieved.
-     * @throws IOException if there is an error parsing the JSON response.
-     */
-    private BigDecimal getCurrentValue(String ticker, String type) throws IOException {
-        // First, check the cache
-        Optional<ExternalApiCache> cacheEntry = externalApiCacheRepository.findByTickerAndType(ticker, type);
-        if (cacheEntry.isPresent()) {
-            ExternalApiCache cache = cacheEntry.get();
-            // Only return the cached value if it's recent enough
-            if (cache.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(5))) {
-                return cache.getCurrentValue();
-            }
-            // Remove the outdated cache entry
-            externalApiCacheRepository.delete(cache);
-        }
-
-        // If not in cache or outdated, fetch from external API
-        BigDecimal currentValue = fetchCurrentValueFromAPI(ticker, type);
-        if (currentValue != null) {
-            // Update the cache
-            ExternalApiCache newCacheEntry = new ExternalApiCache();
-            newCacheEntry.setTicker(ticker);
-            newCacheEntry.setType(type);
-            newCacheEntry.setCurrentValue(currentValue);
-            newCacheEntry.setLastUpdated(LocalDateTime.now());
-            externalApiCacheRepository.save(newCacheEntry);
-        }
-        return currentValue;
-    }
-
-    private BigDecimal fetchCurrentValueFromAPI(String ticker, String type) throws IOException {
-        String url = null;
-        JsonNode root = null;
-
-        try {
-            if ("stock".equalsIgnoreCase(type) || "etf".equalsIgnoreCase(type)) {
-                // Yahoo Finance API URL
-                url = "https://query1.finance.yahoo.com/v8/finance/chart/" + ticker;
-                String response = restTemplate.getForObject(url, String.class);
-                root = objectMapper.readTree(response);
-                // Navigate the JSON structure to find the price.
-                JsonNode resultNode = root.path("chart").path("result").get(0);
-                if (resultNode.isMissingNode()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode indicatorsNode = resultNode.path("indicators");
-                if (indicatorsNode.isMissingNode()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode quoteNode = indicatorsNode.path("quote").get(0);
-
-                if (quoteNode.isMissingNode()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                JsonNode closeNode = quoteNode.path("close").get(0);
-                if (closeNode.isMissingNode() || closeNode.isNull()) {
-                    logger.warn("Invalid response structure from Yahoo Finance for ticker: {}", ticker);
-                    return null;
-                }
-                double price = closeNode.asDouble();
-                return BigDecimal.valueOf(price);
-            } else if ("crypto".equalsIgnoreCase(type)) {
-                // CoinGecko API URL
-                url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ticker + "&vs_currencies=usd";
-                String response = restTemplate.getForObject(url, String.class);
-                root = objectMapper.readTree(response);
-                // CoinGecko returns a JSON object with the ticker as the key.
-                JsonNode priceNode = root.path(ticker.toLowerCase()).path("usd");
-                if (priceNode.isMissingNode()) {
-                    logger.warn("Could not find price for crypto ticker: {} in CoinGecko response", ticker);
-                    return null; // Handle the case where the ticker is not found
-                }
-                double price = priceNode.asDouble();
-                return BigDecimal.valueOf(price);
-            } else {
-                logger.warn("Unsupported asset type: {}", type);
-                return null;
-            }
-        } catch (IOException e) {
-            logger.error("Error fetching/parsing data for {} from {}: {}", ticker, url, e.getMessage());
-            throw e; // Re-throw the exception so it's handled in the controller.
-        } catch (Exception e) {
-            logger.error("Unexpected error fetching data for {} from {}: {}", ticker, url, e.getMessage());
+        } else {
+            logger.warn("Attempted to update current value for non-existent investment: {}", id);
             return null;
         }
     }

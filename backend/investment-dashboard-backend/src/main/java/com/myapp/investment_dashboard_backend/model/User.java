@@ -1,5 +1,6 @@
 package com.myapp.investment_dashboard_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -47,5 +48,6 @@ public class User {
     private Set<UserSetting> settings = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonBackReference
     private Set<Portfolio> portfolios = new HashSet<>();
 }

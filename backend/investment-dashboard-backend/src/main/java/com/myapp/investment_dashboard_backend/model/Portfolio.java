@@ -1,5 +1,6 @@
 package com.myapp.investment_dashboard_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -31,6 +32,7 @@ public class Portfolio {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonBackReference
     private User user;
 
     @Column(nullable = false, length = 100)
@@ -45,6 +47,7 @@ public class Portfolio {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "portfolio", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonBackReference
     private List<Investment> investments = new ArrayList<>();
 
     @Column(name = "total_value")
