@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -6,11 +6,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner'; // For loading indicator
-import { Observable, Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
-import {MarketDataService} from '../../../services/market-data.service';
-import {InstrumentSearchResult} from '../../../services/search.service';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { of, Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, tap, filter, catchError, takeUntil } from 'rxjs/operators';
+import { MarketDataService, InstrumentSearchResult } from '../../../services/market-data.service';
 
 export interface AddInvestmentDialogData {
   portfolioId: number;
@@ -25,7 +24,6 @@ export interface AddInvestmentDialogResult {
   purchasePrice: number;
   portfolioId: number;
 }
-
 
 @Component({
   selector: 'app-add-investment-dialog',
@@ -43,15 +41,13 @@ export interface AddInvestmentDialogResult {
   ],
   templateUrl: './add-investment-dialog.component.html',
 })
-export class AddInvestmentDialogComponent implements OnInit {
+export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
   investmentForm: FormGroup;
   searchControl = new FormControl('');
-  searchResults$: Observable<InstrumentSearchResult[]>;
+  searchResultsList: InstrumentSearchResult[] = [];
   isLoadingSearch = false;
   selectedInstrument: InstrumentSearchResult | null = null;
-
-  // Use Subject for debouncing search input
-  private readonly searchTerms = new Subject<string>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly fb: FormBuilder,
@@ -60,64 +56,82 @@ export class AddInvestmentDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: AddInvestmentDialogData
   ) {
     this.investmentForm = this.fb.group({
-      ticker: [{value: '', disabled: true}, Validators.required], // Start disabled
-      type: [{value: '', disabled: true}, Validators.required], // Start disabled
-      currency: [{value: '', disabled: true}, Validators.required], // Start disabled
+      ticker: [{value: '', disabled: true}, Validators.required],
+      type: [{value: '', disabled: true}, Validators.required],
+      currency: [{value: '', disabled: true}, Validators.required],
       amount: ['', [Validators.required, Validators.min(0.000001)]],
       purchasePrice: ['', [Validators.required, Validators.min(0)]]
     });
 
-    // Setup observable pipeline for search results
-    this.searchResults$ = this.searchTerms.pipe(
-      debounceTime(600), // Wait 300ms after last keystroke
-      distinctUntilChanged(), // Ignore if query hasn't changed
-      tap(() => this.isLoadingSearch = true), // Show loading indicator
-      switchMap((term: string) => this.marketDataService.searchInstruments(term)), // Use marketDataService
-      tap(() => this.isLoadingSearch = false) // Hide loading indicator
-    );
+    this.searchControl.valueChanges.pipe(
+      takeUntil(this.destroy$),
+      debounceTime(500),
+      filter(term => (term || '').length >= 2),
+      distinctUntilChanged(),
+      tap(term => {
+        this.isLoadingSearch = true;
+        if (this.selectedInstrument && term !== this.displayFn(this.selectedInstrument)) {
+          this.resetSelection();
+        }
+      }),
+      switchMap(term =>
+        this.marketDataService.searchInstruments(term || '').pipe(
+          catchError(err => {
+            console.error('Error searching instruments:', err);
+            return of([]);
+          })
+        )
+      ),
+      tap({
+        next: (results: InstrumentSearchResult[]) => {
+          this.searchResultsList = results;
+          this.isLoadingSearch = false;
+        },
+        error: err => {
+          console.error('Error in search pipeline:', err);
+          this.searchResultsList = [];
+          this.isLoadingSearch = false;
+        }
+      })
+    ).subscribe();
   }
 
-  ngOnInit(): void {
-    // Fields are already started disabled in form builder
+  ngOnInit(): void { /* TODO document why this method 'ngOnInit' is empty */  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
-  // Push search term into the Subject stream
-  search(term: string): void {
-    // Reset selection if user types again
+  private resetSelection(): void {
     this.selectedInstrument = null;
     this.investmentForm.get('ticker')?.disable();
     this.investmentForm.get('type')?.disable();
     this.investmentForm.get('currency')?.disable();
     this.investmentForm.patchValue({ ticker: '', type: '', currency: '' });
-
-    this.searchTerms.next(term);
   }
 
-  // When an option is selected from the autocomplete
   onOptionSelected(event: MatAutocompleteSelectedEvent): void {
     this.selectedInstrument = event.option.value as InstrumentSearchResult;
-    console.log('Selected Instrument:', this.selectedInstrument);
 
     if (this.selectedInstrument) {
-      // Patch the form with data from selected instrument
       this.investmentForm.patchValue({
         ticker: this.selectedInstrument.symbol,
         type: this.selectedInstrument.type,
         currency: this.selectedInstrument.currency
       });
-      // Re-enable the fields
       this.investmentForm.get('ticker')?.enable();
       this.investmentForm.get('type')?.enable();
       this.investmentForm.get('currency')?.enable();
 
-      this.searchControl.setValue(''); // Clear search input display
-      this.searchTerms.next(''); // Push empty string to clear results list
+      const displayValue = this.displayFn(this.selectedInstrument);
+      setTimeout(() => {
+        this.searchControl.setValue(displayValue, { emitEvent: false });
+      });
     }
   }
 
-  // Helper to display the name in the autocomplete option
-  displayFn(instrument: InstrumentSearchResult): string {
-    // Handle initial state or if user clears input
+  displayFn(instrument: InstrumentSearchResult | null): string {
     return instrument && instrument.name ? `${instrument.name} (${instrument.symbol})` : '';
   }
 
@@ -129,7 +143,7 @@ export class AddInvestmentDialogComponent implements OnInit {
     if (this.investmentForm.valid && this.selectedInstrument) {
       const result: AddInvestmentDialogResult = {
         ...this.investmentForm.getRawValue(),
-        portfolioId: this.data.portfolioId // Add portfolioId from injected data
+        portfolioId: this.data.portfolioId
       };
       this.dialogRef.close(result);
     } else {

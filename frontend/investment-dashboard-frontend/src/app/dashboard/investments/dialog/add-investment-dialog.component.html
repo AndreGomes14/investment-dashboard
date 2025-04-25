@@ -11,21 +11,20 @@
            placeholder="Start typing..."
            matInput
            [formControl]="searchControl"
-           [matAutocomplete]="auto"
-           (input)="search(searchControl.value || '')">
+           [matAutocomplete]="auto">
     <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onOptionSelected($event)">
       <mat-option *ngIf="isLoadingSearch" class="is-loading">
         <mat-spinner diameter="20"></mat-spinner> Loading...
       </mat-option>
       <ng-container *ngIf="!isLoadingSearch">
-        <mat-option *ngFor="let option of searchResults$ | async" [value]="option">
+        <mat-option *ngFor="let option of searchResultsList" [value]="option">
           <div>
             <strong>{{ option.name }}</strong> ({{ option.symbol }})
           </div>
           <small>{{ option.type }} - {{ option.region }} [{{ option.currency }}]</small>
         </mat-option>
         <!-- Show message if search returns no results -->
-        <mat-option disabled *ngIf="!(searchResults$ | async)?.length && (searchControl.value?.length ?? 0) > 1">
+        <mat-option disabled *ngIf="searchResultsList.length === 0 && (searchControl.value?.length ?? 0) > 1">
           No results found for "{{searchControl.value}}"
         </mat-option>
       </ng-container>
