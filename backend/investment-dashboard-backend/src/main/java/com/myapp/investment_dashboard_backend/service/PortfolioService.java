@@ -1,6 +1,7 @@
 package com.myapp.investment_dashboard_backend.service;
 
 import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
+import com.myapp.investment_dashboard_backend.dto.portfolio.UpdatePortfolioRequest;
 import com.myapp.investment_dashboard_backend.exception.ResourceNotFoundException;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
@@ -74,6 +75,38 @@ public class PortfolioService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + currentUsername));
 
         return portfolioRepository.findByUserId(currentUser.getId());
+    }
+
+    /**
+     * Updates an existing portfolio's name and description.
+     *
+     * @param portfolioId The ID of the portfolio to update.
+     * @param request The DTO containing the updated data.
+     * @return The updated Portfolio object.
+     * @throws ResourceNotFoundException if the portfolio is not found.
+     * @throws AccessDeniedException if the current user doesn't own the portfolio.
+     */
+    @Transactional
+    public Portfolio updatePortfolio(UUID portfolioId, UpdatePortfolioRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
+
+        if (!portfolio.getUser().getUsername().equals(currentUsername)) {
+            logger.warn("User '{}' attempted to update portfolio '{}' owned by '{}'",
+                    currentUsername, portfolioId, portfolio.getUser().getUsername());
+            throw new AccessDeniedException("User does not have permission to update this portfolio.");
+        }
+
+        logger.info("User '{}' updating portfolio '{}' (ID: {}). New name: '{}'",
+                currentUsername, portfolio.getName(), portfolioId, request.getName());
+
+        portfolio.setName(request.getName());
+        portfolio.setDescription(request.getDescription());
+
+        return portfolioRepository.save(portfolio);
     }
 
     /**

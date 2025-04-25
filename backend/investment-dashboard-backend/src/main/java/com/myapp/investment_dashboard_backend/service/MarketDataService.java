@@ -2,19 +2,25 @@ package com.myapp.investment_dashboard_backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
+import com.myapp.investment_dashboard_backend.dto.investment.InstrumentSearchResult;
 import com.myapp.investment_dashboard_backend.model.ExternalApiCache;
 import com.myapp.investment_dashboard_backend.repository.ExternalApiCacheRepository;
+import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -27,6 +33,8 @@ public class MarketDataService {
 
     @Value("${alphavantage.api.key}")
     private String alphaVantageApiKey;
+
+    private final String ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
 
     @Autowired
     public MarketDataService(ExternalApiCacheRepository externalApiCacheRepository, RestTemplate restTemplate, ObjectMapper objectMapper) {
@@ -99,6 +107,7 @@ public class MarketDataService {
                 String response = restTemplate.getForObject(url, String.class);
                 root = objectMapper.readTree(response);
 
+                // Check for Alpha Vantage API errors or information messages (like rate limits)
                 if (root.has("Error Message")) {
                     logger.error("Alpha Vantage API error for ticker {}: {}", ticker, root.path("Error Message").asText());
                     return null;
@@ -108,8 +117,10 @@ public class MarketDataService {
                     return null; // Treat rate limit as a temporary failure
                 }
 
+                // Navigate the Alpha Vantage JSON structure
                 JsonNode globalQuoteNode = root.path("Global Quote");
                 if (globalQuoteNode.isMissingNode() || !globalQuoteNode.isObject() || globalQuoteNode.isEmpty()) {
+                    // Check if the object is empty, which can happen if the ticker is invalid for AlphaVantage
                     logger.warn("Invalid response structure or empty 'Global Quote' node from Alpha Vantage for ticker: {}.", ticker);
                     return null;
                 }
@@ -122,6 +133,8 @@ public class MarketDataService {
 
                 String priceStr = priceNode.asText();
                 try {
+                    // Assume Alpha Vantage returns price in the targetCurrency (e.g., USD for US stocks)
+                    // More complex logic needed if AV returns mixed currencies or if we need conversion here.
                     BigDecimal value = new BigDecimal(priceStr);
                     return new PriceInfo(value, targetCurrency);
                 } catch (NumberFormatException e) {
@@ -130,11 +143,13 @@ public class MarketDataService {
                 }
 
             } else if ("crypto".equalsIgnoreCase(type)) {
+                // Use CoinGecko, requesting the target currency
                 String coinGeckoCurrency = targetCurrency.toLowerCase(); // CoinGecko uses lowercase currency codes
                 url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ticker + "&vs_currencies=" + coinGeckoCurrency;
                 logger.debug("Fetching from CoinGecko: {}", url);
                 String response = restTemplate.getForObject(url, String.class);
                 root = objectMapper.readTree(response);
+                // Path uses the requested currency code
                 JsonNode priceNode = root.path(ticker.toLowerCase()).path(coinGeckoCurrency);
                 if (priceNode.isMissingNode()) {
                     logger.warn("Could not find price for crypto ticker: {} in currency {} from CoinGecko response", ticker, coinGeckoCurrency);
@@ -142,7 +157,7 @@ public class MarketDataService {
                 }
                 try {
                     BigDecimal value = BigDecimal.valueOf(priceNode.asDouble());
-                    return new PriceInfo(value, targetCurrency.toUpperCase());
+                    return new PriceInfo(value, targetCurrency.toUpperCase()); // Return with uppercase currency code
                 } catch (NumberFormatException e) {
                     logger.error("Error parsing price from CoinGecko for ticker {} ({}): {}", ticker, coinGeckoCurrency, e.getMessage());
                     return null;
@@ -154,10 +169,68 @@ public class MarketDataService {
             }
         } catch (IOException e) {
             logger.error("Network or parsing error fetching data for {} (type: {}) from {}: {}", ticker, type, url, e.getMessage());
-            throw e;
+            throw e; // Re-throw IOExceptions
         } catch (Exception e) {
             logger.error("Unexpected error fetching data for {} (type: {}) from {}: {}", ticker, type, url, e.getMessage());
-            return null;
+            return null; // Return null for other unexpected errors
+        }
+    }
+
+    /**
+     * Searches for financial instruments using the Alpha Vantage API.
+     * @param query The search keyword string.
+     * @return A list of matching instruments.
+     */
+    public List<InstrumentSearchResult> searchInstruments(String query) {
+        if (alphaVantageApiKey == null || alphaVantageApiKey.isEmpty() || alphaVantageApiKey.equals("YOUR_API_KEY")) {
+            logger.error("Alpha Vantage API key is not configured. Please set alphavantage.api.key in application properties.");
+            return Collections.emptyList();
+        }
+
+        String url = UriComponentsBuilder.fromHttpUrl(ALPHA_VANTAGE_BASE_URL)
+                .queryParam("function", "SYMBOL_SEARCH")
+                .queryParam("keywords", query)
+                .queryParam("apikey", alphaVantageApiKey)
+                .toUriString();
+
+        logger.info("Searching Alpha Vantage for instruments matching: {}", query);
+
+        try {
+            String jsonResponse = restTemplate.getForObject(url, String.class);
+
+            JsonNode rootNode = objectMapper.readTree(jsonResponse);
+            JsonNode bestMatches = rootNode.path("bestMatches");
+
+            if (bestMatches.isArray()) {
+                List<InstrumentSearchResult> results = new ArrayList<>();
+                for (JsonNode match : bestMatches) {
+                    results.add(new InstrumentSearchResult(
+                            match.path("1. symbol").asText(null),
+                            match.path("2. name").asText(null),
+                            match.path("3. type").asText(null),
+                            match.path("4. region").asText(null),
+                            match.path("8. currency").asText(null)
+                    ));
+                }
+                logger.info("Found {} matches for query '{}'", results.size(), query);
+                return results;
+            } else {
+                logger.warn("Alpha Vantage search response for query '{}' did not contain 'bestMatches'. Response: {}", query, jsonResponse);
+                if(rootNode.has("Note")) {
+                    logger.warn("Alpha Vantage API Note: {}", rootNode.path("Note").asText());
+                }
+                return Collections.emptyList();
+            }
+
+        } catch (HttpClientErrorException e) {
+            logger.error("HTTP error searching Alpha Vantage instruments for '{}': {} - {}", query, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            return Collections.emptyList();
+        } catch (IOException e) {
+            logger.error("Error parsing Alpha Vantage search response for query '{}': {}", query, e.getMessage(), e);
+            return Collections.emptyList();
+        } catch (Exception e) {
+            logger.error("Unexpected error searching Alpha Vantage instruments for query '{}': {}", query, e.getMessage(), e);
+            return Collections.emptyList();
         }
     }
 }

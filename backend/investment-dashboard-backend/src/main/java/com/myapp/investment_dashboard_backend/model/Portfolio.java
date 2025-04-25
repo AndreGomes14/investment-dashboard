@@ -52,4 +52,7 @@ public class Portfolio {
 
     @Column(name = "total_value")
     private BigDecimal totalValue;
+
+    @Column(name = "description")
+    private String description;
 }

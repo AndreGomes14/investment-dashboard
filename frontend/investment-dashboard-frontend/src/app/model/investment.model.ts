@@ -10,6 +10,7 @@ export interface Investment {
   purchasePrice: number;
   currentValue?: number;
   lastUpdateDate?: Date;
+  currency: string;
   status: 'ACTIVE' | 'SOLD' | 'DELETED';
   createdAt?: Date;
   updatedAt?: Date;

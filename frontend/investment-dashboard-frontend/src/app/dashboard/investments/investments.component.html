@@ -1,245 +1,135 @@
 <div class="investments-container">
   <div class="page-header">
     <h1>Investments Management</h1>
-    <p class="subtitle">Manage and optimize your investment portfolio</p>
+    <p class="subtitle">Manage your portfolios and investments</p>
   </div>
-  
-  <div class="action-buttons">
-    <button mat-raised-button color="primary">
-      <mat-icon>add</mat-icon>
-      Add Investment
-    </button>
-    <button mat-raised-button color="accent">
-      <mat-icon>autorenew</mat-icon>
-      Rebalance Portfolio
-    </button>
-    <button mat-raised-button>
-      <mat-icon>download</mat-icon>
-      Export Data
-    </button>
+
+  <div class="loading-container" *ngIf="isLoading || isCreatingPortfolio || isUpdatingPortfolio || isDeletingPortfolio">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>
+      {{ isCreatingPortfolio ? 'Creating Portfolio...'
+      : isUpdatingPortfolio ? 'Updating Portfolio...'
+        : isDeletingPortfolio ? 'Deleting Portfolio...'
+          : 'Loading Portfolio Information...' }}
+    </p>
   </div>
-  
-  <div class="section">
-    <h2 class="section-title">Active Investments</h2>
-    
-    <mat-tab-group>
-      <mat-tab label="Stocks & ETFs">
-        <div class="investment-cards">
-          <mat-card class="investment-card">
-            <mat-card-header>
-              <div mat-card-avatar class="stock-avatar">TSLA</div>
-              <mat-card-title>Tesla, Inc.</mat-card-title>
-              <mat-card-subtitle>Technology - Electric Vehicles</mat-card-subtitle>
-            </mat-card-header>
+
+  <div *ngIf="!isLoading && !isCreatingPortfolio && !isUpdatingPortfolio && !isDeletingPortfolio">
+    <!-- Portfolio Actions Section -->
+    <div class="action-section portfolio-actions">
+      <h2>Portfolio Management</h2>
+      <div class="action-buttons">
+        <button mat-raised-button color="primary" (click)="createPortfolio()">
+          <mat-icon>add_circle_outline</mat-icon>
+          Create Portfolio
+        </button>
+        <button mat-raised-button color="accent" (click)="editPortfolio()" [disabled]="!hasPortfolios || !selectedPortfolioId">
+          <mat-icon>edit</mat-icon>
+          Edit Selected Portfolio
+        </button>
+        <button mat-raised-button color="warn" (click)="deletePortfolio()" [disabled]="!hasPortfolios || !selectedPortfolioId">
+          <mat-icon>delete_outline</mat-icon>
+          Delete Selected Portfolio
+        </button>
+      </div>
+      <p *ngIf="!hasPortfolios" class="info-message">Create a portfolio first to start managing portfolios and investments.</p>
+    </div>
+
+    <!-- Portfolio Selection Dropdown (Conditional) -->
+    <div class="portfolio-selector" *ngIf="hasPortfolios">
+      <mat-form-field appearance="fill">
+        <mat-label>Select Portfolio</mat-label>
+        <mat-select [(ngModel)]="selectedPortfolioId" (ngModelChange)="onPortfolioSelected()" name="selectedPortfolio">
+          <mat-option *ngFor="let portfolio of portfolios" [value]="portfolio.id">
+            {{ portfolio.name }}
+          </mat-option>
+        </mat-select>
+        <mat-hint *ngIf="!selectedPortfolioId">Select a portfolio to manage its investments.</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="action-section investment-actions" *ngIf="hasPortfolios && selectedPortfolioId">
+      <h2>Investment Management for Selected Portfolio</h2>
+      <div class="action-buttons">
+        <button mat-raised-button color="primary" (click)="createInvestment()">
+          <mat-icon>add_circle</mat-icon>
+          Add Investment
+        </button>
+        <button mat-raised-button>
+          <mat-icon>auto renew</mat-icon>
+          Rebalanced
+        </button>
+        <button mat-raised-button>
+          <mat-icon>download</mat-icon>
+          Export Data
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="hasPortfolios && selectedPortfolioId">
+      <div class="section">
+        <h2 class="section-title">Active Investments in [Selected Portfolio Name]</h2>
+
+        <!-- Investment Loading / No Data State -->
+        <div *ngIf="isLoadingInvestments" class="loading-container">
+          <mat-spinner diameter="30"></mat-spinner>
+          <p>Loading investments...</p>
+        </div>
+        <div *ngIf="!isLoadingInvestments && (!investmentsForSelectedPortfolio || investmentsForSelectedPortfolio.length === 0)">
+          <mat-card class="info-card">
             <mat-card-content>
-              <div class="investment-data">
-                <div class="data-row">
-                  <span class="label">Current Price:</span>
-                  <span class="value">$780.45</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Shares Owned:</span>
-                  <span class="value">12</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Total Value:</span>
-                  <span class="value">$9,365.40</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Return:</span>
-                  <span class="value positive">+23.5%</span>
-                </div>
-              </div>
+              <p class="info-message">No investments found in this portfolio.</p>
+              <button mat-button color="primary" (click)="createInvestment()">
+                <mat-icon>add_circle</mat-icon> Add First Investment
+              </button>
             </mat-card-content>
-            <mat-card-actions>
-              <button mat-button color="primary">BUY MORE</button>
-              <button mat-button color="warn">SELL</button>
-              <button mat-button>DETAILS</button>
-            </mat-card-actions>
-          </mat-card>
-          
-          <mat-card class="investment-card">
-            <mat-card-header>
-              <div mat-card-avatar class="stock-avatar">AAPL</div>
-              <mat-card-title>Apple Inc.</mat-card-title>
-              <mat-card-subtitle>Technology - Consumer Electronics</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="investment-data">
-                <div class="data-row">
-                  <span class="label">Current Price:</span>
-                  <span class="value">$152.75</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Shares Owned:</span>
-                  <span class="value">35</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Total Value:</span>
-                  <span class="value">$5,346.25</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Return:</span>
-                  <span class="value positive">+15.2%</span>
-                </div>
-              </div>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-button color="primary">BUY MORE</button>
-              <button mat-button color="warn">SELL</button>
-              <button mat-button>DETAILS</button>
-            </mat-card-actions>
-          </mat-card>
-          
-          <mat-card class="investment-card">
-            <mat-card-header>
-              <div mat-card-avatar class="stock-avatar">VTI</div>
-              <mat-card-title>Vanguard Total Stock Market ETF</mat-card-title>
-              <mat-card-subtitle>ETF - US Equity</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="investment-data">
-                <div class="data-row">
-                  <span class="label">Current Price:</span>
-                  <span class="value">$221.32</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Shares Owned:</span>
-                  <span class="value">43</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Total Value:</span>
-                  <span class="value">$9,516.76</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Return:</span>
-                  <span class="value positive">+8.7%</span>
-                </div>
-              </div>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-button color="primary">BUY MORE</button>
-              <button mat-button color="warn">SELL</button>
-              <button mat-button>DETAILS</button>
-            </mat-card-actions>
           </mat-card>
         </div>
-      </mat-tab>
-      
-      <mat-tab label="Bonds & Fixed Income">
-        <div class="investment-cards">
-          <mat-card class="investment-card">
-            <mat-card-header>
-              <div mat-card-avatar class="bond-avatar">BND</div>
-              <mat-card-title>Vanguard Total Bond Market ETF</mat-card-title>
-              <mat-card-subtitle>Bond ETF - Diversified</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="investment-data">
-                <div class="data-row">
-                  <span class="label">Current Price:</span>
-                  <span class="value">$82.48</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Shares Owned:</span>
-                  <span class="value">85</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Total Value:</span>
-                  <span class="value">$7,010.80</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Return:</span>
-                  <span class="value positive">+3.2%</span>
-                </div>
-              </div>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-button color="primary">BUY MORE</button>
-              <button mat-button color="warn">SELL</button>
-              <button mat-button>DETAILS</button>
-            </mat-card-actions>
-          </mat-card>
-        </div>
-      </mat-tab>
-      
-      <mat-tab label="Alternative Investments">
-        <div class="investment-cards">
-          <mat-card class="investment-card">
-            <mat-card-header>
-              <div mat-card-avatar class="alt-avatar">REIT</div>
-              <mat-card-title>Vanguard Real Estate ETF</mat-card-title>
-              <mat-card-subtitle>REIT - Diversified</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="investment-data">
-                <div class="data-row">
-                  <span class="label">Current Price:</span>
-                  <span class="value">$104.22</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Shares Owned:</span>
-                  <span class="value">32</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Total Value:</span>
-                  <span class="value">$3,335.04</span>
-                </div>
-                <div class="data-row">
-                  <span class="label">Return:</span>
-                  <span class="value negative">-1.8%</span>
-                </div>
-              </div>
-            </mat-card-content>
-            <mat-card-actions>
-              <button mat-button color="primary">BUY MORE</button>
-              <button mat-button color="warn">SELL</button>
-              <button mat-button>DETAILS</button>
-            </mat-card-actions>
-          </mat-card>
-        </div>
-      </mat-tab>
-    </mat-tab-group>
-  </div>
-  
-  <div class="section">
-    <h2 class="section-title">Investment Opportunities</h2>
-    <p class="section-subtitle">Suggestions based on your investment profile and market conditions</p>
-    
-    <div class="investment-cards">
-      <mat-card class="opportunity-card">
-        <mat-card-header>
-          <mat-icon mat-card-avatar class="opportunity-icon">trending_up</mat-icon>
-          <mat-card-title>Growth Opportunity</mat-card-title>
-          <mat-card-subtitle>Technology Sector ETF</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <p>This technology sector ETF could provide strong growth potential in your portfolio given the current market trends.</p>
-          <p><strong>Expected Return: </strong>15-20% annually</p>
-          <p><strong>Risk Level: </strong>Moderate-High</p>
-        </mat-card-content>
-        <mat-card-actions>
-          <button mat-button color="primary">RESEARCH</button>
-          <button mat-button color="accent">INVEST NOW</button>
-        </mat-card-actions>
-      </mat-card>
-      
-      <mat-card class="opportunity-card">
-        <mat-card-header>
-          <mat-icon mat-card-avatar class="opportunity-icon">attach_money</mat-icon>
-          <mat-card-title>Income Strategy</mat-card-title>
-          <mat-card-subtitle>Dividend Aristocrats ETF</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <p>Companies with a history of consistent dividend increases can provide reliable income in various market conditions.</p>
-          <p><strong>Expected Return: </strong>8-10% annually</p>
-          <p><strong>Risk Level: </strong>Low-Moderate</p>
-        </mat-card-content>
-        <mat-card-actions>
-          <button mat-button color="primary">RESEARCH</button>
-          <button mat-button color="accent">INVEST NOW</button>
-        </mat-card-actions>
-      </mat-card>
+
+        <mat-tab-group *ngIf="!isLoadingInvestments && investmentsForSelectedPortfolio && investmentsForSelectedPortfolio.length > 0">
+          <!-- TODO: Potentially create tabs dynamically based on investment types present -->
+          <mat-tab label="All Investments">
+            <div class="investment-cards">
+              <mat-card class="investment-card" *ngFor="let investment of investmentsForSelectedPortfolio">
+                <mat-card-header>
+                  <div mat-card-avatar class="stock-avatar">{{ investment.ticker.substring(0, 4) }}</div>
+                  <mat-card-title>{{ investment.ticker }}</mat-card-title>
+                  <mat-card-subtitle>{{ investment.type }}</mat-card-subtitle>
+                  <button mat-icon-button class="card-action-button" (click)="editInvestment(investment)" matTooltip="Edit Investment">
+                    <mat-icon>edit_note</mat-icon>
+                  </button>
+                  <button mat-icon-button color="warn" class="card-action-button" (click)="deleteInvestment(investment)" matTooltip="Delete Investment">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </mat-card-header>
+                <mat-card-content>
+                  <div class="investment-data">
+                    <div class="data-row">
+                      <span class="label">Amount:</span>
+                      <span class="value">{{ investment.amount | number }}</span>
+                    </div>
+                    <div class="data-row">
+                      <span class="label">Purchase Price:</span>
+                      <span class="value">{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</span>
+                    </div>
+                    <div class="data-row">
+                      <span class="label">Current Value/Unit:</span>
+                      <span class="value">{{ (investment.currentValue ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</span>
+                    </div>
+                    <div class="data-row">
+                      <span class="label">Total Value:</span>
+                      <span class="value"><strong>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</strong></span>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </mat-tab>
+          <!-- Potential other tabs (e.g., Stocks, Bonds) could filter investmentsForSelectedPortfolio -->
+        </mat-tab-group>
+      </div>
     </div>
   </div>
 </div>

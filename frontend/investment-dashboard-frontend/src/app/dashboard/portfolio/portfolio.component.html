@@ -1,7 +1,24 @@
-<div class="portfolio-container">
+<div class="loading-container" *ngIf="isLoading">
+  <mat-spinner diameter="50"></mat-spinner>
+  <p>Loading Portfolio Data...</p>
+</div>
+
+<div *ngIf="!isLoading && !hasPortfolioData" class="no-data-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Portfolio Not Set Up</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>You currently have no portfolio or investments setup.</p>
+      <p>Please go to the <strong>Investment Management</strong> tab to create a portfolio and add your first investments.</p>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<div class="portfolio-container" *ngIf="!isLoading && hasPortfolioData">
   <div class="page-header">
     <h1>Portfolio Overview</h1>
-    <p class="subtitle">Your investment portfolio at a glance</p>
+    <p class="subtitle" *ngIf="portfolios && portfolios.length > 0">{{ portfolios[0].name }}</p>
   </div>
 
   <div class="metrics-row">
@@ -12,11 +29,7 @@
         <mat-card-subtitle>Current Holdings</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <h2 class="metric-value">$185,750.00</h2>
-        <div class="metric-change positive">
-          <mat-icon>arrow_upward</mat-icon>
-          <span>+2.4% today</span>
-        </div>
+        <h2 class="metric-value">{{ totalPortfolioValue | currency:'USD':'symbol':'1.2-2' }}</h2>
       </mat-card-content>
     </mat-card>
 
@@ -24,13 +37,15 @@
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">trending_up</mat-icon>
         <mat-card-title>Total Gain/Loss</mat-card-title>
-        <mat-card-subtitle>Return on Investment</mat-card-subtitle>
+        <mat-card-subtitle>Overall Return</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <h2 class="metric-value">$23,450.00</h2>
-        <div class="metric-change positive">
-          <mat-icon>arrow_upward</mat-icon>
-          <span>+14.5% overall</span>
+        <h2 class="metric-value" [ngClass]="totalGainLoss >= 0 ? 'positive' : 'negative'">
+          {{ totalGainLoss | currency:'USD':'symbol':'1.2-2' }}
+        </h2>
+        <div class="metric-change" [ngClass]="totalGainLoss >= 0 ? 'positive' : 'negative'">
+          <mat-icon>{{ totalGainLoss >= 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+          <span>{{ totalGainLossPercentage | number:'1.1-2' }}% overall</span>
         </div>
       </mat-card-content>
     </mat-card>
@@ -53,7 +68,7 @@
             <span>Cash: 10%</span>
           </div>
           <div class="allocation-item" style="width: 5%; background-color: #e53935;">
-            <span>Real Estate: 5%</span>
+            <span>Other: 5%</span>
           </div>
         </div>
       </mat-card-content>
@@ -63,101 +78,40 @@
   <div class="holdings-section">
     <div class="section-header">
       <h2>Your Holdings</h2>
-      <button mat-raised-button color="primary">
+      <button mat-raised-button color="primary" routerLink="../investments">
         <mat-icon>add</mat-icon>
-        Add New Investment
+        Manage Investments
       </button>
     </div>
 
-    <mat-card>
+    <mat-card *ngIf="!investments || investments.length === 0">
+      <mat-card-content>
+        <p class="info-message">No investments found in this portfolio. Go to 'Investment Management' to add some.</p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card *ngIf="investments && investments.length > 0">
       <div class="table-responsive">
         <table class="holdings-table">
           <thead>
-            <tr>
-              <th>Asset</th>
-              <th>Type</th>
-              <th>Value</th>
-              <th>Allocation</th>
-              <th>Return</th>
-              <th>Actions</th>
-            </tr>
+          <tr>
+            <th>Asset (Ticker)</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Purchase Price</th>
+            <th>Current Value</th>
+            <th>Total Value</th>
+          </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Technology ETF</td>
-              <td>ETF</td>
-              <td>$65,000.00</td>
-              <td>35%</td>
-              <td class="positive">+22.4%</td>
-              <td>
-                <button mat-icon-button color="primary">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td>S&P 500 Index Fund</td>
-              <td>Index Fund</td>
-              <td>$45,250.00</td>
-              <td>24%</td>
-              <td class="positive">+18.1%</td>
-              <td>
-                <button mat-icon-button color="primary">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td>Corporate Bond Fund</td>
-              <td>Bond Fund</td>
-              <td>$37,500.00</td>
-              <td>20%</td>
-              <td class="positive">+5.2%</td>
-              <td>
-                <button mat-icon-button color="primary">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td>High-Yield Savings</td>
-              <td>Cash</td>
-              <td>$18,000.00</td>
-              <td>10%</td>
-              <td class="positive">+2.8%</td>
-              <td>
-                <button mat-icon-button color="primary">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td>Real Estate Fund</td>
-              <td>REIT</td>
-              <td>$20,000.00</td>
-              <td>11%</td>
-              <td class="negative">-1.5%</td>
-              <td>
-                <button mat-icon-button color="primary">
-                  <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </td>
-            </tr>
+          <tr *ngFor="let investment of investments">
+            <td>{{ investment.ticker }}</td>
+            <td>{{ investment.type }}</td>
+            <td>{{ investment.amount | number }}</td>
+            <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
+            <td>{{ (investment.currentValue ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+            <td>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+          </tr>
           </tbody>
         </table>
       </div>

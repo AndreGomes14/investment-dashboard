@@ -1,9 +1,11 @@
 package com.myapp.investment_dashboard_backend.controller;
 
 import com.myapp.investment_dashboard_backend.dto.portfolio.CreatePortfolioRequest;
+import com.myapp.investment_dashboard_backend.dto.portfolio.UpdatePortfolioRequest;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
 import com.myapp.investment_dashboard_backend.model.User;
 import com.myapp.investment_dashboard_backend.service.PortfolioService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,6 +67,21 @@ public class PortfolioController {
         } else {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Updates an existing portfolio's name and description.
+     *
+     * @param id      The ID of the portfolio to update.
+     * @param request The DTO containing the updated details.
+     * @return ResponseEntity containing the updated portfolio and HTTP status.
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Portfolio> updatePortfolio(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdatePortfolioRequest request) {
+
+        return ResponseEntity.ok(portfolioService.updatePortfolio(id, request));
     }
 
     /**
