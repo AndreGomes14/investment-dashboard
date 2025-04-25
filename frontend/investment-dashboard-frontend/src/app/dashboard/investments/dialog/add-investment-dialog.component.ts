@@ -69,7 +69,7 @@ export class AddInvestmentDialogComponent implements OnInit {
 
     // Setup observable pipeline for search results
     this.searchResults$ = this.searchTerms.pipe(
-      debounceTime(300), // Wait 300ms after last keystroke
+      debounceTime(600), // Wait 300ms after last keystroke
       distinctUntilChanged(), // Ignore if query hasn't changed
       tap(() => this.isLoadingSearch = true), // Show loading indicator
       switchMap((term: string) => this.marketDataService.searchInstruments(term)), // Use marketDataService

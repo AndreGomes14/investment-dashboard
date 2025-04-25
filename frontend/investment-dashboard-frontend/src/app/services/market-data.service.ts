@@ -29,7 +29,7 @@ export class MarketDataService {
    */
   searchInstruments(query: string): Observable<InstrumentSearchResult[]> {
     if (!query || query.trim().length < 2) {
-      return of([]); // Don't search for empty or very short strings
+      return of([]);
     }
 
     const params = new HttpParams().set('query', query.trim());
