@@ -18,15 +18,21 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.model.Investment;
+import com.myapp.investment_dashboard_backend.service.InvestmentService;
+
 @RestController
 @RequestMapping("/api/portfolios")
 public class PortfolioController {
 
     private final PortfolioService portfolioService;
+    private final InvestmentService investmentService;
 
     @Autowired
-    public PortfolioController(PortfolioService portfolioService) {
+    public PortfolioController(PortfolioService portfolioService, InvestmentService investmentService) {
         this.portfolioService = portfolioService;
+        this.investmentService = investmentService;
     }
 
     /**
@@ -39,6 +45,22 @@ public class PortfolioController {
     public ResponseEntity<Portfolio> getPortfolioById(@PathVariable UUID id) {
         Optional<Portfolio> portfolio = portfolioService.getPortfolioByIdWithInvestments(id);
         return portfolio.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    }
+
+    /**
+     * Creates a new investment within a specific portfolio.
+     * Handles POST /api/portfolios/{portfolioId}/investments
+     *
+     * @param portfolioId The ID of the portfolio to add the investment to.
+     * @param request     DTO containing investment creation details.
+     * @return ResponseEntity containing the created investment.
+     */
+    @PostMapping("/{portfolioId}/investments")
+    public ResponseEntity<Investment> createInvestment(
+            @PathVariable UUID portfolioId,
+            @Valid @RequestBody CreateInvestmentRequest request) {
+        Investment createdInvestment = investmentService.createInvestment(portfolioId, request);
+        return new ResponseEntity<>(createdInvestment, HttpStatus.CREATED);
     }
 
     /**

@@ -54,15 +54,30 @@ public class InvestmentService {
     }
 
     /**
-     * Creates a new investment.
+     * Creates a new investment within a specific portfolio.
+     * The portfolio must exist and belong to the authenticated user (logic should be added here or via security rules).
+     *
+     * @param portfolioId The ID of the portfolio to add the investment to.
+     * @param request     The DTO containing the new investment details.
+     * @return The created investment entity.
+     * @throws ResourceNotFoundException if the portfolio is not found or accessible.
      */
     @Transactional
-    public Investment createInvestment(CreateInvestmentRequest request) {
-        Portfolio portfolio = portfolioRepository.findById(request.getPortfolioId())
-                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + request.getPortfolioId()));
+    public Investment createInvestment(UUID portfolioId, CreateInvestmentRequest request) {
+        // --- Authorization/Validation ---
+        // TODO: Add robust check: Does the portfolio exist AND belong to the current authenticated user?
+        // Example (requires SecurityUtils/UserRepository or similar):
+        // String currentUsername = SecurityUtils.getCurrentUsername().orElseThrow(() -> new AuthenticationCredentialsNotFoundException("User not authenticated"));
+        // Portfolio portfolio = portfolioRepository.findByIdAndUserUsername(portfolioId, currentUsername)
+        //         .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId + " or access denied"));
 
+        // Simplified check (replace with proper auth check):
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
+
+        // --- Mapping and Creation ---
         Investment investment = new Investment();
-        investment.setPortfolio(portfolio);
+        investment.setPortfolio(portfolio); // Set from the found portfolio
         investment.setTicker(request.getTicker());
         investment.setType(request.getType());
         investment.setAmount(request.getAmount());

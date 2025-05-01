@@ -213,24 +213,59 @@ export class InvestmentsComponent implements OnInit {
   }
 
   createInvestment() {
-    if (!this.selectedPortfolioId) {
+    if (!this.selectedPortfolioId || !this.portfolios) {
       this.snackBar.open('Please select a portfolio first.', 'Close', { duration: 3000 });
       return;
     }
-    console.log(`Create Investment clicked for portfolio: ${this.selectedPortfolioId}`);
+
+    const selectedPortfolio = this.portfolios.find(p => p.id === this.selectedPortfolioId);
+    if (!selectedPortfolio) {
+      this.snackBar.open('Selected portfolio not found. Please refresh.', 'Close', { duration: 3000 });
+      return;
+    }
+
+    console.log(`Create Investment clicked for portfolio: ${this.selectedPortfolioId} (${selectedPortfolio.name})`);
 
     const dialogRef = this.dialog.open(AddInvestmentDialogComponent, {
-      width: '500px',
-      data: { portfolioId: this.selectedPortfolioId }
+      width: '500px', // Adjust width as needed
+      data: {
+        portfolioId: this.selectedPortfolioId,
+        portfolioName: selectedPortfolio.name // Pass name for display in dialog
+      }
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        console.log('Add Investment Dialog closed with:', result);
-        // TODO: Call InvestmentService.createInvestment(result)
-        // this.investmentService.createInvestment(result).subscribe(...);
-        // TODO: Refresh investment list on success
-        // this.loadInvestmentsForSelectedPortfolio();
+      // Check if result is not null or undefined (user didn't cancel)
+      if (result && this.selectedPortfolioId) {
+        console.log('Add Investment Dialog closed with data:', result);
+
+        // The result already contains portfolioId from the dialog, but we use the component's selectedPortfolioId for certainty
+        // The service method expects the investment data separately from portfolioId
+        const investmentData = {
+          ticker: result.ticker,
+          type: result.type,
+          currency: result.currency,
+          amount: result.amount,
+          purchasePrice: result.purchasePrice
+        };
+
+        // Add a loading indicator for the creation process if desired
+        // this.isLoadingInvestments = true;
+
+        this.investmentService.createInvestment(this.selectedPortfolioId, investmentData)
+          // .pipe(finalize(() => this.isLoadingInvestments = false)) // Use finalize if you add a loading indicator
+          .subscribe(createdInvestment => {
+            if (createdInvestment) {
+              this.snackBar.open(`Investment '${createdInvestment.ticker}' added successfully!`, 'Close', { duration: 3000 });
+              // Refresh the investment list for the currently selected portfolio
+              this.loadInvestmentsForSelectedPortfolio();
+            } else {
+              // Error message is handled by the service
+              console.log('Investment creation failed (service returned null).');
+            }
+          });
+      } else {
+        console.log('Add Investment Dialog was cancelled or returned no result.');
       }
     });
   }

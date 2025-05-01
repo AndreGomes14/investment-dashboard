@@ -57,6 +57,37 @@ export class InvestmentService {
     );
   }
 
-  // TODO: Add createInvestment, updateInvestment, deleteInvestment methods later
+  /**
+   * Creates a new investment within a specific portfolio.
+   * @param portfolioId The ID of the portfolio to add the investment to.
+   * @param investmentData The data for the new investment.
+   * @returns Observable of the created Investment or null on error.
+   */
+  createInvestment(portfolioId: number, investmentData: any): Observable<Investment | null> {
+    const url = `${this.portfolioApiUrl}/${portfolioId}/investments`;
+    console.log(`Attempting to create investment at: ${url}`, investmentData);
+
+    // **Important:** Map the frontend `investmentData` to the backend's expected DTO format if they differ.
+    // Assuming they match for now, but transformation might be needed here.
+    const backendPayload = {
+      ticker: investmentData.ticker,
+      type: investmentData.type,
+      currency: investmentData.currency,
+      amount: investmentData.amount,
+      purchasePrice: investmentData.purchasePrice
+      // portfolioId is in the URL, not the body for this endpoint
+    };
+
+    return this.http.post<Investment>(url, backendPayload).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error creating investment for portfolio ${portfolioId}:`, error);
+        const errorMessage = error.error?.message || error.error?.error || 'Failed to create investment.'; // Try to get backend error message
+        this.snackBar.open(`Error: ${errorMessage}`, 'Close', { duration: 5000 });
+        return of(null); // Return null on error
+      })
+    );
+  }
+
+  // TODO: Add updateInvestment, deleteInvestment methods later
   // They will likely need the portfolioId passed to them as well.
 }

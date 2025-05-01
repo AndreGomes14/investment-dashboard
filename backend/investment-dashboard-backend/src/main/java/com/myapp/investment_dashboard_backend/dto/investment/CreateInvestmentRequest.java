@@ -10,15 +10,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateInvestmentRequest {
-    @NotNull(message = "Portfolio ID is required")
-    private UUID portfolioId;
 
     @NotBlank(message = "Ticker is required")
     private String ticker;
