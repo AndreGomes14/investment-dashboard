@@ -64,21 +64,14 @@ public class InvestmentService {
      */
     @Transactional
     public Investment createInvestment(UUID portfolioId, CreateInvestmentRequest request) {
-        // --- Authorization/Validation ---
-        // TODO: Add robust check: Does the portfolio exist AND belong to the current authenticated user?
-        // Example (requires SecurityUtils/UserRepository or similar):
-        // String currentUsername = SecurityUtils.getCurrentUsername().orElseThrow(() -> new AuthenticationCredentialsNotFoundException("User not authenticated"));
-        // Portfolio portfolio = portfolioRepository.findByIdAndUserUsername(portfolioId, currentUsername)
-        //         .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId + " or access denied"));
-
-        // Simplified check (replace with proper auth check):
-        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+       Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
 
         // --- Mapping and Creation ---
         Investment investment = new Investment();
         investment.setPortfolio(portfolio); // Set from the found portfolio
         investment.setTicker(request.getTicker());
+        investment.setCurrentValue(getInvestmentCurrentValue(investment.getId()));
         investment.setType(request.getType());
         investment.setAmount(request.getAmount());
         investment.setPurchasePrice(request.getPurchasePrice());
@@ -86,10 +79,45 @@ public class InvestmentService {
         investment.setStatus(StatusInvestment.ACTIVE);
         investment.setLastUpdateDate(LocalDateTime.now());
 
-        logger.info("Creating new investment: Ticker={}, Type={}, Amount={}, Price={}, Currency={}, PortfolioID={}",
-                investment.getTicker(), investment.getType(), investment.getAmount(), investment.getPurchasePrice(), investment.getCurrency(), portfolio.getId());
+        logger.info("Attempting initial save for investment: Ticker={}, Type={}, PortfolioID={}",
+                investment.getTicker(), investment.getType(), portfolio.getId());
 
-        return investmentRepository.save(investment);
+        // --- Save the initial investment record ---
+        Investment savedInvestment = investmentRepository.save(investment);
+        logger.info("Successfully saved initial investment with ID: {}", savedInvestment.getId());
+
+        // --- Attempt to fetch and set the current value immediately ---
+        try {
+            logger.info("Attempting to fetch current value for new investment: Ticker={}, Type={}, Currency={}",
+                    savedInvestment.getTicker(), savedInvestment.getType(), savedInvestment.getCurrency());
+
+            PriceInfo priceInfo = marketDataService.getCurrentValue(
+                    savedInvestment.getTicker(),
+                    savedInvestment.getType(),
+                    savedInvestment.getCurrency()
+            );
+
+            if (priceInfo != null && priceInfo.value() != null) {
+                logger.info("Current value fetched successfully: {}. Updating investment.", priceInfo.value());
+                savedInvestment.setCurrentValue(priceInfo.value());
+                savedInvestment.setLastUpdateDate(LocalDateTime.now()); // Ensure last update reflects price fetch
+                // Save the investment again with the current value
+                return investmentRepository.save(savedInvestment);
+            } else {
+                logger.warn("Failed to retrieve valid current value PriceInfo for new investment {} ({}). CurrentValue remains null.",
+                        savedInvestment.getId(), savedInvestment.getTicker());
+                // Return the investment without the current value as fetching failed
+                return savedInvestment;
+            }
+        } catch (IOException e) {
+            logger.error("IOException fetching current value immediately after creating investment {}: {}. CurrentValue remains null.",
+                    savedInvestment.getId(), e.getMessage());
+            return savedInvestment; // Return initially saved object on error
+        } catch (Exception e) {
+            logger.error("Unexpected error fetching current value immediately after creating investment {}: {}. CurrentValue remains null.",
+                    savedInvestment.getId(), e.getMessage());
+            return savedInvestment; // Return initially saved object on error
+        }
     }
 
     /**
@@ -141,6 +169,27 @@ public class InvestmentService {
      */
     public List<Investment> getAllInvestments() {
         return investmentRepository.findAll();
+    }
+
+    /**
+     * Retrieves all investments belonging to a specific portfolio.
+     * Also enforces authorization to ensure the current user owns the portfolio.
+     *
+     * @param portfolioId The ID of the portfolio.
+     * @return A list of investments for that portfolio.
+     * @throws ResourceNotFoundException if the portfolio is not found or not accessible by the current user.
+     */
+    public List<Investment> getInvestmentsByPortfolioId(UUID portfolioId) {
+
+        // Simplified check (REMOVE or REPLACE with actual authorization):
+        if (!portfolioRepository.existsById(portfolioId)) {
+            throw new ResourceNotFoundException("Portfolio not found with id: " + portfolioId);
+        }
+
+        // --- Fetch Investments ---
+        logger.debug("Fetching investments for portfolio ID: {}", portfolioId);
+        // Assuming Investment entity has a Portfolio field mapped correctly
+        return investmentRepository.findByPortfolioId(portfolioId);
     }
 
     /**

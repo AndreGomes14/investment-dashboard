@@ -64,6 +64,19 @@ public class PortfolioController {
     }
 
     /**
+     * Retrieves all investments for a specific portfolio.
+     * Handles GET /api/portfolios/{portfolioId}/investments
+     *
+     * @param portfolioId The ID of the portfolio whose investments are to be retrieved.
+     * @return ResponseEntity containing the list of investments for the portfolio.
+     */
+    @GetMapping("/{portfolioId}/investments")
+    public ResponseEntity<List<Investment>> getInvestmentsByPortfolioId(@PathVariable UUID portfolioId) {
+        List<Investment> investments = investmentService.getInvestmentsByPortfolioId(portfolioId);
+        return ResponseEntity.ok(investments);
+    }
+
+    /**
      * Creates a new portfolio.
      *
      * @param request DTO containing portfolio creation details (e.g., name).

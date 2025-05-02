@@ -67,15 +67,12 @@ export class InvestmentService {
     const url = `${this.portfolioApiUrl}/${portfolioId}/investments`;
     console.log(`Attempting to create investment at: ${url}`, investmentData);
 
-    // **Important:** Map the frontend `investmentData` to the backend's expected DTO format if they differ.
-    // Assuming they match for now, but transformation might be needed here.
     const backendPayload = {
       ticker: investmentData.ticker,
       type: investmentData.type,
       currency: investmentData.currency,
       amount: investmentData.amount,
       purchasePrice: investmentData.purchasePrice
-      // portfolioId is in the URL, not the body for this endpoint
     };
 
     return this.http.post<Investment>(url, backendPayload).pipe(
@@ -88,6 +85,53 @@ export class InvestmentService {
     );
   }
 
-  // TODO: Add updateInvestment, deleteInvestment methods later
-  // They will likely need the portfolioId passed to them as well.
+  /**
+   * Deletes an investment by its ID.
+   * @param investmentId The ID of the investment to delete.
+   * @returns Observable<boolean> indicating success (true) or failure (false).
+   */
+  deleteInvestment(investmentId: string): Observable<boolean> {
+    const url = `${this.investmentsApiUrl}/${investmentId}`;
+    console.log(`Attempting to delete investment at: ${url}`);
+
+    return this.http.delete<void>(url).pipe( // Expecting no content on success (204)
+      map(() => true), // Map successful deletion (void response) to true
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error deleting investment ${investmentId}:`, error);
+        const errorMessage = error.error?.message || error.error?.error || 'Failed to delete investment.';
+        this.snackBar.open(`Error: ${errorMessage}`, 'Close', { duration: 5000 });
+        return of(false); // Return false on error
+      })
+    );
+  }
+
+  /**
+   * Updates an existing investment.
+   * Sends only the fields that can be updated (amount, purchasePrice).
+   * @param investmentId The ID of the investment to update.
+   * @param updateData An object containing the fields to update (e.g., { amount: number, purchasePrice: number }).
+   * @returns Observable of the updated Investment or null on error.
+   */
+  updateInvestment(investmentId: string, updateData: { amount?: number, purchasePrice?: number }): Observable<Investment | null> {
+    const url = `${this.investmentsApiUrl}/${investmentId}`;
+    console.log(`Attempting to update investment at: ${url}`, updateData);
+
+    // Construct payload with only the allowed updatable fields
+    const backendPayload: any = {};
+    if (updateData.amount !== undefined) {
+      backendPayload.amount = updateData.amount;
+    }
+    if (updateData.purchasePrice !== undefined) {
+      backendPayload.purchasePrice = updateData.purchasePrice;
+    }
+
+    return this.http.put<Investment>(url, backendPayload).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error updating investment ${investmentId}:`, error);
+        const errorMessage = error.error?.message || error.error?.error || 'Failed to update investment.';
+        this.snackBar.open(`Error: ${errorMessage}`, 'Close', { duration: 5000 });
+        return of(null); // Return null on error
+      })
+    );
+  }
 }

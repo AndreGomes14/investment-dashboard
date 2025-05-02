@@ -93,10 +93,12 @@ public class MarketDataService {
     private PriceInfo fetchCurrentValueFromAPI(String ticker, String type, String targetCurrency) throws IOException {
         String url = null;
         JsonNode root = null;
+        String effectiveType = (type != null) ? type.toLowerCase() : ""; // Normalize type
 
         try {
-            if ("stock".equalsIgnoreCase(type) || "etf".equalsIgnoreCase(type)) {
-                // Use Alpha Vantage for stocks/ETFs
+            // Treat "equity" the same as "stock" for API fetching purposes
+            if ("stock".equals(effectiveType) || "etf".equals(effectiveType) || "equity".equals(effectiveType)) {
+                // Use Alpha Vantage for stocks/ETFs/Equity
                 if (alphaVantageApiKey == null || alphaVantageApiKey.isEmpty() || "YOUR_ACTUAL_API_KEY".equals(alphaVantageApiKey)) {
                     logger.error("Alpha Vantage API key is not configured properly in application.properties.");
                     return null;
@@ -142,7 +144,7 @@ public class MarketDataService {
                     return null;
                 }
 
-            } else if ("crypto".equalsIgnoreCase(type)) {
+            } else if ("crypto".equalsIgnoreCase(effectiveType)) { // Use normalized type
                 // Use CoinGecko, requesting the target currency
                 String coinGeckoCurrency = targetCurrency.toLowerCase(); // CoinGecko uses lowercase currency codes
                 url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ticker + "&vs_currencies=" + coinGeckoCurrency;
@@ -164,7 +166,7 @@ public class MarketDataService {
                 }
 
             } else {
-                logger.warn("Unsupported asset type: {}", type);
+                logger.warn("Unsupported asset type: {}", type); // Log original type if not handled
                 return null;
             }
         } catch (IOException e) {

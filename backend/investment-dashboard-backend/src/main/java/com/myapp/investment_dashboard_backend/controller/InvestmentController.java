@@ -1,7 +1,9 @@
 package com.myapp.investment_dashboard_backend.controller;
 
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +42,23 @@ public class InvestmentController {
     public ResponseEntity<Investment> getInvestmentById(@PathVariable UUID id) {
         Optional<Investment> investment = investmentService.getInvestmentById(id);
         return investment.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    }
+
+    /**
+     * Updates an existing investment.
+     *
+     * @param id      The ID of the investment to update.
+     * @param request The DTO containing the fields to update.
+     * @return ResponseEntity containing the updated investment.
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Investment> updateInvestment(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateInvestmentRequest request) {
+        // Note: Authorization check (does user own this investment?) should ideally
+        // happen in the service layer before updating.
+        Investment updatedInvestment = investmentService.updateInvestment(id, request);
+        return ResponseEntity.ok(updatedInvestment);
     }
 
     /**

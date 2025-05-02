@@ -21,6 +21,19 @@ import {CreatePortfolioDialogComponent} from '../portfolio/dialog/create-portfol
 import {EditPortfolioDialogComponent} from '../portfolio/dialog/edit-portfolio-dialog.component';
 import {ConfirmDeleteDialogComponent} from '../portfolio/dialog/confirm-delete-dialog.component';
 import {AddInvestmentDialogComponent} from './dialog/add-investment-dialog.component';
+import {EditInvestmentDialogComponent, EditInvestmentDialogResult} from './dialog/edit-investment-dialog.component';
+
+// Define the interface for aggregated data
+interface AggregatedInvestment {
+  ticker: string;
+  type: string;
+  currency: string;
+  totalAmount: number;
+  averagePurchasePrice: number;
+  totalPurchaseCost: number;
+  totalCurrentValue: number | null;
+  individualInvestments: Investment[];
+}
 
 @Component({
   selector: 'app-investments',
@@ -51,6 +64,7 @@ export class InvestmentsComponent implements OnInit {
   portfolios: Portfolio[] | null = null;
   selectedPortfolioId: number | null = null;
   investmentsForSelectedPortfolio: Investment[] | null = null;
+  aggregatedInvestments: AggregatedInvestment[] | null = null;
 
   constructor(
     private readonly portfolioService: PortfolioService,
@@ -69,6 +83,7 @@ export class InvestmentsComponent implements OnInit {
     }
     this.selectedPortfolioId = null;
     this.investmentsForSelectedPortfolio = null;
+    this.aggregatedInvestments = null;
     this.portfolioService.getUserPortfolios()
       .pipe(
         finalize(() => { if (showLoading) { this.isLoading = false; } })
@@ -105,16 +120,73 @@ export class InvestmentsComponent implements OnInit {
     if (!this.selectedPortfolioId) return;
 
     this.isLoadingInvestments = true;
+    this.investmentsForSelectedPortfolio = null;
+    this.aggregatedInvestments = null;
+
     this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
       .pipe(finalize(() => this.isLoadingInvestments = false))
       .subscribe(investments => {
         this.investmentsForSelectedPortfolio = investments;
-        if (investments) {
-          console.log(`Loaded ${investments.length} investments for portfolio ${this.selectedPortfolioId}`);
+        if (investments && investments.length > 0) {
+          console.log(`Loaded ${investments.length} individual investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
+          this.aggregateInvestments(investments);
+          console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
+        } else if (investments) {
+          console.log(`No investments exist for portfolio ${this.selectedPortfolioId}`);
+          this.aggregatedInvestments = [];
         } else {
-          console.log(`Failed to load investments or none exist for portfolio ${this.selectedPortfolioId}`);
+          console.log(`Failed to load investments for portfolio ${this.selectedPortfolioId}`);
         }
       });
+  }
+
+  private aggregateInvestments(investments: Investment[]): void {
+    const groups = new Map<string, AggregatedInvestment>();
+
+    for (const investment of investments) {
+      if (!investment.ticker) continue;
+
+      const key = investment.ticker;
+      let group = groups.get(key);
+
+      if (!group) {
+        group = {
+          ticker: investment.ticker,
+          type: investment.type || 'N/A',
+          currency: investment.currency || 'N/A',
+          totalAmount: 0,
+          averagePurchasePrice: 0,
+          totalPurchaseCost: 0,
+          totalCurrentValue: 0,
+          individualInvestments: []
+        };
+        groups.set(key, group);
+      }
+
+      const purchaseCost = (investment.amount ?? 0) * (investment.purchasePrice ?? 0);
+      group.totalAmount += (investment.amount ?? 0);
+      group.totalPurchaseCost += purchaseCost;
+
+      if (investment.currentValue != null) {
+        const currentVal = (investment.amount ?? 0) * investment.currentValue;
+        group.totalCurrentValue = (group.totalCurrentValue ?? 0) + currentVal;
+      } else {
+        group.totalCurrentValue = null;
+      }
+
+      group.individualInvestments.push(investment);
+    }
+
+    this.aggregatedInvestments = Array.from(groups.values()).map(group => {
+      if (group.totalAmount > 0) {
+        group.averagePurchasePrice = group.totalPurchaseCost / group.totalAmount;
+      } else {
+        group.averagePurchasePrice = 0;
+      }
+      return group;
+    });
+
+    this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));
   }
 
   createPortfolio() {
@@ -227,20 +299,17 @@ export class InvestmentsComponent implements OnInit {
     console.log(`Create Investment clicked for portfolio: ${this.selectedPortfolioId} (${selectedPortfolio.name})`);
 
     const dialogRef = this.dialog.open(AddInvestmentDialogComponent, {
-      width: '500px', // Adjust width as needed
+      width: '500px',
       data: {
         portfolioId: this.selectedPortfolioId,
-        portfolioName: selectedPortfolio.name // Pass name for display in dialog
+        portfolioName: selectedPortfolio.name
       }
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      // Check if result is not null or undefined (user didn't cancel)
       if (result && this.selectedPortfolioId) {
         console.log('Add Investment Dialog closed with data:', result);
 
-        // The result already contains portfolioId from the dialog, but we use the component's selectedPortfolioId for certainty
-        // The service method expects the investment data separately from portfolioId
         const investmentData = {
           ticker: result.ticker,
           type: result.type,
@@ -249,18 +318,12 @@ export class InvestmentsComponent implements OnInit {
           purchasePrice: result.purchasePrice
         };
 
-        // Add a loading indicator for the creation process if desired
-        // this.isLoadingInvestments = true;
-
         this.investmentService.createInvestment(this.selectedPortfolioId, investmentData)
-          // .pipe(finalize(() => this.isLoadingInvestments = false)) // Use finalize if you add a loading indicator
           .subscribe(createdInvestment => {
             if (createdInvestment) {
               this.snackBar.open(`Investment '${createdInvestment.ticker}' added successfully!`, 'Close', { duration: 3000 });
-              // Refresh the investment list for the currently selected portfolio
               this.loadInvestmentsForSelectedPortfolio();
             } else {
-              // Error message is handled by the service
               console.log('Investment creation failed (service returned null).');
             }
           });
@@ -271,35 +334,68 @@ export class InvestmentsComponent implements OnInit {
   }
 
   editInvestment(investment: Investment) {
-    if (!this.selectedPortfolioId) {
-      this.snackBar.open('Cannot edit investment: No portfolio selected.', 'Close', { duration: 3000 });
+    if (!this.selectedPortfolioId || !investment || !investment.id) {
+      this.snackBar.open('Cannot edit investment: Invalid selection or investment data.', 'Close', { duration: 3000 });
       return;
     }
     console.log(`Edit Investment clicked for:`, investment);
-    console.log(`Portfolio ID: ${this.selectedPortfolioId}`);
-    // TODO: Implement dialog/form logic for editing this specific investment
-    // Example:
-    // const dialogRef = this.dialog.open(EditInvestmentDialogComponent, { data: { investment: investment, portfolioId: this.selectedPortfolioId } });
-    // dialogRef.afterClosed().subscribe(result => { ... });
+
+    const dialogRef = this.dialog.open(EditInvestmentDialogComponent, {
+      width: '450px',
+      data: { investment: investment }
+    });
+
+    dialogRef.afterClosed().subscribe((result: EditInvestmentDialogResult | undefined) => {
+      if (result && investment.id) {
+        console.log('Edit Investment Dialog closed with data:', result);
+        const investmentIdStr = String(investment.id);
+
+        this.investmentService.updateInvestment(investmentIdStr, result)
+          .subscribe(updatedInvestment => {
+            if (updatedInvestment) {
+              this.snackBar.open(`Investment '${updatedInvestment.ticker}' updated successfully!`, 'Close', { duration: 3000 });
+              this.loadInvestmentsForSelectedPortfolio();
+            } else {
+              console.error('Investment update failed (service returned null).');
+            }
+          });
+      } else {
+        console.log('Edit Investment Dialog was cancelled or returned no result.');
+      }
+    });
   }
 
   deleteInvestment(investment: Investment) {
-    if (!this.selectedPortfolioId) {
-      this.snackBar.open('Cannot delete investment: No portfolio selected.', 'Close', { duration: 3000 });
+    if (!this.selectedPortfolioId || !investment || !investment.id) {
+      this.snackBar.open('Cannot delete investment: Invalid selection or investment data.', 'Close', { duration: 3000 });
       return;
     }
-    console.log(`Delete Investment clicked for:`, investment);
-    console.log(`Portfolio ID: ${this.selectedPortfolioId}`);
+    console.log(`Delete Investment requested for:`, investment);
 
-    // TODO: Open confirmation dialog
-    // Example:
-    // const dialogRef = this.dialog.open(ConfirmDeleteDialogComponent, {
-    //   data: { title: 'Confirm Deletion', message: `Delete investment '${investment.ticker}'?` }
-    // });
-    // dialogRef.afterClosed().subscribe(confirmed => {
-    //    if (confirmed) {
-    //        this.investmentService.deleteInvestment(investment.id, this.selectedPortfolioId).subscribe(...);
-    //    }
-    // });
+    const dialogRef = this.dialog.open(ConfirmDeleteDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Confirm Deletion',
+        message: `Are you sure you want to delete the investment in '${investment.ticker || 'N/A'}'? This action cannot be undone.`,
+        confirmText: 'Delete'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed && investment.id) {
+        console.log(`Deletion confirmed for investment ID: ${investment.id}`);
+
+        this.investmentService.deleteInvestment(String(investment.id)).subscribe(success => {
+          if (success) {
+            this.snackBar.open(`Investment '${investment.ticker}' deleted successfully.`, 'Close', { duration: 3000 });
+            this.loadInvestmentsForSelectedPortfolio();
+          } else {
+            console.error(`Failed to delete investment ${investment.id}`);
+          }
+        });
+      } else {
+        console.log(`Deletion cancelled for investment ID: ${investment.id}`);
+      }
+    });
   }
 }
