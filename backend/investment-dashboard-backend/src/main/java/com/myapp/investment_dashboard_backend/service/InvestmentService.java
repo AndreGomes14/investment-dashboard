@@ -64,14 +64,13 @@ public class InvestmentService {
      */
     @Transactional
     public Investment createInvestment(UUID portfolioId, CreateInvestmentRequest request) {
-       Portfolio portfolio = portfolioRepository.findById(portfolioId)
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
 
         // --- Mapping and Creation ---
         Investment investment = new Investment();
         investment.setPortfolio(portfolio); // Set from the found portfolio
         investment.setTicker(request.getTicker());
-        investment.setCurrentValue(getInvestmentCurrentValue(investment.getId()));
         investment.setType(request.getType());
         investment.setAmount(request.getAmount());
         investment.setPurchasePrice(request.getPurchasePrice());
@@ -186,8 +185,8 @@ public class InvestmentService {
             throw new ResourceNotFoundException("Portfolio not found with id: " + portfolioId);
         }
 
-        // --- Fetch Investments ---
-        logger.debug("Fetching investments for portfolio ID: {}", portfolioId);
+        // --- Fetch Investments --- // MODIFIED
+        logger.debug("Fetching investments directly from repository for portfolio ID: {}", portfolioId);
         // Assuming Investment entity has a Portfolio field mapped correctly
         return investmentRepository.findByPortfolioId(portfolioId);
     }

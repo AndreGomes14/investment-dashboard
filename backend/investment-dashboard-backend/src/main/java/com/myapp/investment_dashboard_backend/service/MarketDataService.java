@@ -60,30 +60,74 @@ public class MarketDataService {
             return null;
         }
         String effectiveTargetCurrency = targetCurrency.trim().toUpperCase();
+        String effectiveType = (type != null) ? type.toLowerCase() : ""; // Normalize type for consistency
 
-        Optional<ExternalApiCache> cacheEntry = externalApiCacheRepository.findByTickerAndType(ticker, type);
-        if (cacheEntry.isPresent()) {
-            ExternalApiCache cache = cacheEntry.get();
-            if (cache.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(5))) {
-                logger.debug("Cache hit for {}:{}. Assuming currency {} from cache.", type, ticker, effectiveTargetCurrency);
-                return new PriceInfo(cache.getCurrentValue(), effectiveTargetCurrency);
+        // Find existing cache entry (if any)
+        Optional<ExternalApiCache> existingCacheEntryOpt = externalApiCacheRepository.findByTickerAndType(ticker, effectiveType);
+
+        // Check if valid cache entry exists
+        if (existingCacheEntryOpt.isPresent()) {
+            ExternalApiCache existingCache = existingCacheEntryOpt.get();
+            // Check freshness
+            if (existingCache.getLastUpdated().isAfter(LocalDateTime.now().minusMinutes(5))) {
+                // Check if cached currency matches target currency
+                if (effectiveTargetCurrency.equalsIgnoreCase(existingCache.getCurrency())) {
+                    logger.debug("Cache hit for {}:{}. Returning cached value.", effectiveType, ticker);
+                    return new PriceInfo(existingCache.getCurrentValue(), effectiveTargetCurrency);
+                } else {
+                    logger.warn("Cache hit for {}:{}, but requested currency {} differs from cached currency {}. Forcing refresh.",
+                            effectiveType, ticker, effectiveTargetCurrency, existingCache.getCurrency());
+                    // Fall through to fetch from API
+                }
+            } else {
+                logger.debug("Cache expired for {}:{}", effectiveType, ticker);
+                // Don't delete, just fall through to fetch and update
             }
-            logger.debug("Cache expired for {}:{}", type, ticker);
-            externalApiCacheRepository.delete(cache);
+        } else {
+            logger.debug("Cache miss for {}:{}. Fetching from API.", effectiveType, ticker);
         }
-        logger.debug("Cache miss for {}:{}. Fetching from API.", type, ticker);
 
-        PriceInfo currentPriceInfo = fetchCurrentValueFromAPI(ticker, type, effectiveTargetCurrency);
+        // Fetch from API if cache missed, expired, or currency mismatch
+        PriceInfo currentPriceInfo = fetchCurrentValueFromAPI(ticker, effectiveType, effectiveTargetCurrency);
+
         if (currentPriceInfo != null) {
-            ExternalApiCache newCacheEntry = new ExternalApiCache();
-            newCacheEntry.setTicker(ticker);
-            newCacheEntry.setType(type);
-            newCacheEntry.setCurrentValue(currentPriceInfo.value());
-            newCacheEntry.setCurrency(effectiveTargetCurrency);
-            newCacheEntry.setLastUpdated(LocalDateTime.now());
-            externalApiCacheRepository.save(newCacheEntry);
-            logger.debug("Cache updated for {}:{}", type, ticker);
+            // Perform Upsert (Update or Insert)
+            ExternalApiCache cacheToSave;
+            if (existingCacheEntryOpt.isPresent()) {
+                // Update existing entry
+                cacheToSave = existingCacheEntryOpt.get();
+                cacheToSave.setType(effectiveType); // Explicitly set normalized type on update too
+                logger.debug("Updating existing cache entry for {}:{}", effectiveType, ticker);
+            } else {
+                // Create new entry
+                cacheToSave = new ExternalApiCache();
+                cacheToSave.setTicker(ticker);
+                cacheToSave.setType(effectiveType); // Use normalized type
+                logger.debug("Creating new cache entry for {}:{}", effectiveType, ticker);
+            }
+            // Set/Update fields common to insert and update
+            cacheToSave.setCurrentValue(currentPriceInfo.value());
+            cacheToSave.setCurrency(effectiveTargetCurrency); // Store the target currency we used for the fetch
+            cacheToSave.setLastUpdated(LocalDateTime.now());
+
+            try {
+                externalApiCacheRepository.save(cacheToSave); // Performs INSERT or UPDATE
+                logger.debug("Cache saved/updated for {}:{}", effectiveType, ticker);
+            } catch (Exception e) {
+                // Log potential errors during save (e.g., unexpected constraint violations)
+                logger.error("Error saving cache entry for {}:{}: {}", effectiveType, ticker, e.getMessage(), e);
+                // Depending on requirements, you might want to still return currentPriceInfo or null here
+            }
+        } else {
+            logger.warn("Failed to fetch current value for {}:{} from API. Cache not updated.", effectiveType, ticker);
+            // Optional: If fetch fails but an expired entry exists, maybe return the expired value?
+            // if (existingCacheEntryOpt.isPresent()) {
+            //     ExternalApiCache expiredCache = existingCacheEntryOpt.get();
+            //     logger.warn("Returning expired cache value for {}:{}", type, ticker);
+            //     return new PriceInfo(expiredCache.getCurrentValue(), expiredCache.getCurrency());
+            // }
         }
+        // Return the freshly fetched info (or null if fetch failed)
         return currentPriceInfo;
     }
 
@@ -184,8 +228,26 @@ public class MarketDataService {
      * @return A list of matching instruments.
      */
     public List<InstrumentSearchResult> searchInstruments(String query) {
-        if (alphaVantageApiKey == null || alphaVantageApiKey.isEmpty() || alphaVantageApiKey.equals("YOUR_API_KEY")) {
-            logger.error("Alpha Vantage API key is not configured. Please set alphavantage.api.key in application properties.");
+        List<InstrumentSearchResult> alphaVantageResults = searchAlphaVantage(query);
+        List<InstrumentSearchResult> coinGeckoResults = searchCoinGecko(query);
+
+        // Combine the results
+        List<InstrumentSearchResult> combinedResults = new ArrayList<>(alphaVantageResults);
+        combinedResults.addAll(coinGeckoResults);
+
+        // Optional: Add logic here to remove duplicates or prioritize one source if needed
+        logger.info("Combined search results for query '{}': Found {} from AlphaVantage, {} from CoinGecko. Total: {}",
+                query, alphaVantageResults.size(), coinGeckoResults.size(), combinedResults.size());
+
+        return combinedResults;
+    }
+
+    /**
+     * Helper method to search Alpha Vantage.
+     */
+    private List<InstrumentSearchResult> searchAlphaVantage(String query) {
+        if (alphaVantageApiKey == null || alphaVantageApiKey.isEmpty() || "YOUR_ACTUAL_API_KEY".equals(alphaVantageApiKey)) {
+            logger.error("Alpha Vantage API key is not configured. Cannot search Alpha Vantage.");
             return Collections.emptyList();
         }
 
@@ -199,22 +261,26 @@ public class MarketDataService {
 
         try {
             String jsonResponse = restTemplate.getForObject(url, String.class);
-
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             JsonNode bestMatches = rootNode.path("bestMatches");
 
             if (bestMatches.isArray()) {
                 List<InstrumentSearchResult> results = new ArrayList<>();
                 for (JsonNode match : bestMatches) {
+                    // Skip if symbol is missing or empty
+                    String symbol = match.path("1. symbol").asText(null);
+                    if (symbol == null || symbol.trim().isEmpty()) {
+                        continue;
+                    }
                     results.add(new InstrumentSearchResult(
-                            match.path("1. symbol").asText(null),
+                            symbol,
                             match.path("2. name").asText(null),
-                            match.path("3. type").asText(null),
+                            match.path("3. type").asText(null), // e.g., Equity, ETF
                             match.path("4. region").asText(null),
                             match.path("8. currency").asText(null)
                     ));
                 }
-                logger.info("Found {} matches for query '{}'", results.size(), query);
+                logger.debug("Alpha Vantage search for '{}' found {} matches.", query, results.size());
                 return results;
             } else {
                 logger.warn("Alpha Vantage search response for query '{}' did not contain 'bestMatches'. Response: {}", query, jsonResponse);
@@ -223,7 +289,6 @@ public class MarketDataService {
                 }
                 return Collections.emptyList();
             }
-
         } catch (HttpClientErrorException e) {
             logger.error("HTTP error searching Alpha Vantage instruments for '{}': {} - {}", query, e.getStatusCode(), e.getResponseBodyAsString(), e);
             return Collections.emptyList();
@@ -232,6 +297,56 @@ public class MarketDataService {
             return Collections.emptyList();
         } catch (Exception e) {
             logger.error("Unexpected error searching Alpha Vantage instruments for query '{}': {}", query, e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Helper method to search CoinGecko for cryptocurrencies.
+     */
+    private List<InstrumentSearchResult> searchCoinGecko(String query) {
+        String url = UriComponentsBuilder.fromHttpUrl("https://api.coingecko.com/api/v3/search")
+                .queryParam("query", query)
+                .toUriString();
+
+        logger.info("Searching CoinGecko for instruments matching: {}", query);
+
+        try {
+            String jsonResponse = restTemplate.getForObject(url, String.class);
+            JsonNode rootNode = objectMapper.readTree(jsonResponse);
+            JsonNode coinsNode = rootNode.path("coins");
+
+            if (coinsNode.isArray()) {
+                List<InstrumentSearchResult> results = new ArrayList<>();
+                for (JsonNode coin : coinsNode) {
+                    // Use symbol (e.g., BTC) as ticker, name as name.
+                    // CoinGecko search doesn't provide region or currency directly.
+                    String symbol = coin.path("symbol").asText(null);
+                    if (symbol == null || symbol.trim().isEmpty()) {
+                        continue; // Skip if essential info missing
+                    }
+                    results.add(new InstrumentSearchResult(
+                            symbol,
+                            coin.path("name").asText(null),
+                            "Crypto", // Set type explicitly
+                            null, // Region not available from this endpoint
+                            null // Currency not available from this endpoint
+                    ));
+                }
+                logger.debug("CoinGecko search for '{}' found {} coin matches.", query, results.size());
+                return results;
+            } else {
+                logger.warn("CoinGecko search response for query '{}' did not contain 'coins' array. Response: {}", query, jsonResponse);
+                return Collections.emptyList();
+            }
+        } catch (HttpClientErrorException e) {
+            logger.error("HTTP error searching CoinGecko instruments for '{}': {} - {}", query, e.getStatusCode(), e.getResponseBodyAsString(), e);
+            return Collections.emptyList();
+        } catch (IOException e) {
+            logger.error("Error parsing CoinGecko search response for query '{}': {}", query, e.getMessage(), e);
+            return Collections.emptyList();
+        } catch (Exception e) {
+            logger.error("Unexpected error searching CoinGecko instruments for query '{}': {}", query, e.getMessage(), e);
             return Collections.emptyList();
         }
     }

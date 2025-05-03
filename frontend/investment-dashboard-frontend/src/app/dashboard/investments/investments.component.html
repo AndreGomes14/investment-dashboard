@@ -88,14 +88,83 @@
           </mat-card>
         </div>
 
-        <mat-tab-group *ngIf="!isLoadingInvestments && investmentsForSelectedPortfolio && investmentsForSelectedPortfolio.length > 0">
-          <!-- TODO: Potentially create tabs dynamically based on investment types present -->
-          <mat-tab label="All Investments">
+        <mat-tab-group *ngIf="!isLoadingInvestments && aggregatedInvestments && aggregatedInvestments.length > 0">
+          <!-- Display aggregated investments -->
+          <mat-tab label="Aggregated View">
+            <div class="investment-cards">
+              <!-- Iterate over the aggregated list -->
+              <mat-expansion-panel class="investment-card aggregated-card"
+                                   *ngFor="let aggInvestment of aggregatedInvestments"
+                                   [disabled]="aggInvestment.individualInvestments.length <= 1"
+                                   hideToggle="{{ aggInvestment.individualInvestments.length <= 1 }}">
+                <mat-expansion-panel-header>
+                  <!-- Restructured Header -->
+                  <mat-panel-title class="aggregated-header-title">
+                    <div class="header-left">
+                      <div class="ticker-info">
+                        <span class="ticker-main">{{ aggInvestment.ticker }}</span>
+                        <span class="ticker-type">{{ aggInvestment.type }}</span>
+                      </div>
+                    </div>
+                    <div class="header-right summary-values">
+                      <div class="summary-item">
+                        <span class="label">Total Units:</span>
+                        <span class="value">{{ aggInvestment.totalAmount | number }}</span>
+                      </div>
+                      <div class="summary-item">
+                        <span class="label">Avg. Price:</span>
+                        <span class="value">{{ aggInvestment.averagePurchasePrice | currency:aggInvestment.currency:'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="summary-item">
+                        <span class="label">Total Value:</span>
+                        <span class="value" *ngIf="aggInvestment.totalCurrentValue !== null">
+                                  {{ aggInvestment.totalCurrentValue | currency:aggInvestment.currency:'symbol':'1.2-2' }}
+                              </span>
+                        <span class="value unavailable" *ngIf="aggInvestment.totalCurrentValue === null">N/A</span>
+                      </div>
+                      <div class="summary-item">
+                        <span class="label">Profit %:</span>
+                        <span class="value profit-value"
+                              *ngIf="aggInvestment.percentProfit !== null"
+                              [class.positive]="aggInvestment.percentProfit > 0"
+                              [class.negative]="aggInvestment.percentProfit < 0">
+                                  {{ aggInvestment.percentProfit | percent:'1.2-2' }}
+                              </span>
+                        <span class="value unavailable" *ngIf="aggInvestment.percentProfit === null">N/A</span>
+                      </div>
+                    </div>
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+
+                <!-- Content shown when panel is expanded -->
+                <h4>Individual Lots ({{ aggInvestment.individualInvestments.length }})</h4>
+                <mat-divider></mat-divider>
+                <div class="individual-investment-list">
+                  <div *ngFor="let investment of aggInvestment.individualInvestments" class="individual-item">
+                    <span>Amount: {{ investment.amount | number }}</span>
+                    <span>&#64; {{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</span>
+                    <span>on {{ investment.createdAt | date:'shortDate' }}</span>
+                    <!-- Removed ID -->
+                    <button mat-icon-button class="individual-action-button" (click)="editInvestment(investment)" matTooltip="Edit this lot">
+                      <mat-icon>edit_note</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" class="individual-action-button" (click)="deleteInvestment(investment)" matTooltip="Delete this lot">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </div>
+          </mat-tab>
+
+          <!-- Tab to show individual investments -->
+          <mat-tab label="Individual Investments">
             <div class="investment-cards">
               <mat-card class="investment-card" *ngFor="let investment of investmentsForSelectedPortfolio">
                 <mat-card-header>
                   <div mat-card-avatar class="stock-avatar">{{ investment.ticker.substring(0, 4) }}</div>
                   <mat-card-title>{{ investment.ticker }}</mat-card-title>
+                  <!-- Removed ID from subtitle -->
                   <mat-card-subtitle>{{ investment.type }}</mat-card-subtitle>
                   <button mat-icon-button class="card-action-button" (click)="editInvestment(investment)" matTooltip="Edit Investment">
                     <mat-icon>edit_note</mat-icon>
@@ -116,18 +185,38 @@
                     </div>
                     <div class="data-row">
                       <span class="label">Current Value/Unit:</span>
-                      <span class="value">{{ (investment.currentValue ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</span>
+                      <span class="value" *ngIf="investment.currentValue !== null">
+                         {{ investment.currentValue | currency:investment.currency:'symbol':'1.2-2' }}
+                       </span>
+                      <span class="value unavailable" *ngIf="investment.currentValue === null"> N/A </span>
                     </div>
                     <div class="data-row">
                       <span class="label">Total Value:</span>
-                      <span class="value"><strong>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</strong></span>
+                      <span class="value" *ngIf="investment.currentValue !== null">
+                          <strong>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</strong>
+                        </span>
+                      <span class="value unavailable" *ngIf="investment.currentValue === null"> N/A </span>
+                    </div>
+                    <div class="data-row">
+                      <span class="label">Profit %:</span>
+                      <span class="value profit-value"
+                            *ngIf="investment.percentProfit !== null"
+                            [class.positive]="(investment.percentProfit ?? 0) > 0"
+                            [class.negative]="(investment.percentProfit ?? 0) < 0">
+                             {{ investment.percentProfit | percent:'1.2-2' }}
+                        </span>
+                      <span class="value unavailable" *ngIf="investment.percentProfit === null">N/A</span>
+                    </div>
+                    <div class="data-row">
+                      <span class="label">Purchase Date:</span>
+                      <span class="value">{{ investment.createdAt | date:'shortDate' }}</span>
                     </div>
                   </div>
                 </mat-card-content>
               </mat-card>
             </div>
           </mat-tab>
-          <!-- Potential other tabs (e.g., Stocks, Bonds) could filter investmentsForSelectedPortfolio -->
+
         </mat-tab-group>
       </div>
     </div>

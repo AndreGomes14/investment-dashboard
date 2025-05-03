@@ -12,6 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatExpansionModule } from '@angular/material/expansion';
 
 import { PortfolioService } from '../../services/portfolio.service';
 import { InvestmentService } from '../../services/investment.service';
@@ -22,6 +23,7 @@ import {EditPortfolioDialogComponent} from '../portfolio/dialog/edit-portfolio-d
 import {ConfirmDeleteDialogComponent} from '../portfolio/dialog/confirm-delete-dialog.component';
 import {AddInvestmentDialogComponent} from './dialog/add-investment-dialog.component';
 import {EditInvestmentDialogComponent, EditInvestmentDialogResult} from './dialog/edit-investment-dialog.component';
+import {MatTooltip} from '@angular/material/tooltip';
 
 // Define the interface for aggregated data
 interface AggregatedInvestment {
@@ -32,6 +34,7 @@ interface AggregatedInvestment {
   averagePurchasePrice: number;
   totalPurchaseCost: number;
   totalCurrentValue: number | null;
+  percentProfit: number | null;
   individualInvestments: Investment[];
 }
 
@@ -49,7 +52,9 @@ interface AggregatedInvestment {
     MatDialogModule,
     MatDividerModule,
     MatFormFieldModule,
-    MatSelectModule
+    MatSelectModule,
+    MatExpansionModule,
+    MatTooltip
   ],
   templateUrl: './investments.component.html',
   styleUrls: ['./investments.component.css']
@@ -126,6 +131,24 @@ export class InvestmentsComponent implements OnInit {
     this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
       .pipe(finalize(() => this.isLoadingInvestments = false))
       .subscribe(investments => {
+        // Add percentProfit dynamically to each investment object
+        if (investments) {
+          investments.forEach((inv: any) => {
+            const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
+            const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
+
+            if (totalCurrentValue !== null && totalPurchaseCost > 0) {
+              inv.percentProfit = (totalCurrentValue - totalPurchaseCost) / totalPurchaseCost;
+            } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue > 0) {
+              inv.percentProfit = Infinity;
+            } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue === 0) {
+              inv.percentProfit = 0;
+            } else {
+              inv.percentProfit = null;
+            }
+          });
+        }
+
         this.investmentsForSelectedPortfolio = investments;
         if (investments && investments.length > 0) {
           console.log(`Loaded ${investments.length} individual investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
@@ -146,7 +169,7 @@ export class InvestmentsComponent implements OnInit {
     for (const investment of investments) {
       if (!investment.ticker) continue;
 
-      const key = investment.ticker;
+      const key = (investment.ticker || '').trim().toUpperCase();
       let group = groups.get(key);
 
       if (!group) {
@@ -158,6 +181,7 @@ export class InvestmentsComponent implements OnInit {
           averagePurchasePrice: 0,
           totalPurchaseCost: 0,
           totalCurrentValue: 0,
+          percentProfit: null,
           individualInvestments: []
         };
         groups.set(key, group);
@@ -184,6 +208,21 @@ export class InvestmentsComponent implements OnInit {
         group.averagePurchasePrice = 0;
       }
       return group;
+    });
+
+    // Calculate percentProfit after average price
+    this.aggregatedInvestments.forEach(group => {
+      if (group.totalCurrentValue !== null && group.totalPurchaseCost > 0) {
+        group.percentProfit = ((group.totalCurrentValue - group.totalPurchaseCost) / group.totalPurchaseCost);
+      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue > 0) {
+        // Handle case where cost is zero but value is positive (e.g., free shares)
+        group.percentProfit = Infinity;
+      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue === 0) {
+        group.percentProfit = 0; // Cost and value are zero
+      } else {
+        // Cannot calculate if currentValue is null or if cost is negative/invalid (though cost shouldn't be negative here)
+        group.percentProfit = null;
+      }
     });
 
     this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));

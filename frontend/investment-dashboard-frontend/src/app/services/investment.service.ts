@@ -1,20 +1,19 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { environment } from '../../environments/environment'; // Ensure correct path
-import { Investment } from '../model/investment.model'; // Assuming model exists
-import { HttpErrorResponse } from '@angular/common/http'; // Import HttpErrorResponse
-import { MatSnackBar } from '@angular/material/snack-bar'; // Import MatSnackBar
+import { environment } from '../../environments/environment';
+import { Investment } from '../model/investment.model';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Injectable({
   providedIn: 'root'
 })
 export class InvestmentService {
   private readonly investmentsApiUrl = environment.apiUrl + '/api/investments';
-  private readonly portfolioApiUrl = environment.apiUrl + '/api/portfolios'; // Need portfolio endpoint base
+  private readonly portfolioApiUrl = environment.apiUrl + '/api/portfolios';
 
-  constructor(private readonly http: HttpClient, private readonly snackBar: MatSnackBar) { } // Inject MatSnackBar
+  constructor(private readonly http: HttpClient, private readonly snackBar: MatSnackBar) { }
 
   /**
    * Fetches all investments (potentially across all user portfolios).

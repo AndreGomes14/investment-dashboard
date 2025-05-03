@@ -55,8 +55,6 @@ public class InvestmentController {
     public ResponseEntity<Investment> updateInvestment(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateInvestmentRequest request) {
-        // Note: Authorization check (does user own this investment?) should ideally
-        // happen in the service layer before updating.
         Investment updatedInvestment = investmentService.updateInvestment(id, request);
         return ResponseEntity.ok(updatedInvestment);
     }
