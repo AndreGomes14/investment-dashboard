@@ -146,6 +146,9 @@
                     <button mat-icon-button class="individual-action-button" (click)="editInvestment(investment)" matTooltip="Edit this lot">
                       <mat-icon>edit_note</mat-icon>
                     </button>
+                    <button mat-icon-button color="primary" class="individual-action-button" (click)="sellInvestment(investment)" matTooltip="Mark as Sold">
+                      <mat-icon>sell</mat-icon>
+                    </button>
                     <button mat-icon-button color="warn" class="individual-action-button" (click)="deleteInvestment(investment)" matTooltip="Delete this lot">
                       <mat-icon>delete</mat-icon>
                     </button>
@@ -162,10 +165,12 @@
                 <mat-card-header>
                   <div mat-card-avatar class="stock-avatar">{{ investment.ticker.substring(0, 4) }}</div>
                   <mat-card-title>{{ investment.ticker }}</mat-card-title>
-                  <!-- Removed ID from subtitle -->
                   <mat-card-subtitle>{{ investment.type }}</mat-card-subtitle>
                   <button mat-icon-button class="card-action-button" (click)="editInvestment(investment)" matTooltip="Edit Investment">
                     <mat-icon>edit_note</mat-icon>
+                  </button>
+                  <button mat-icon-button color="primary" class="card-action-button" (click)="sellInvestment(investment)" matTooltip="Mark as Sold">
+                    <mat-icon>sell</mat-icon>
                   </button>
                   <button mat-icon-button color="warn" class="card-action-button" (click)="deleteInvestment(investment)" matTooltip="Delete Investment">
                     <mat-icon>delete</mat-icon>

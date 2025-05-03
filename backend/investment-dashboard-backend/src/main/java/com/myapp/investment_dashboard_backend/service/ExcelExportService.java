@@ -43,7 +43,7 @@ public class ExcelExportService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Investments");
 
-            // --- Create Header Row ---
+            // --- Create    Header Row ---
             String[] headers = {"Ticker", "Type", "Currency", "Units", "Purchase Price", "Current Value", "Status", "Purchase Date", "Last Price Update"};
             Row headerRow = sheet.createRow(0);
             CellStyle headerCellStyle = workbook.createCellStyle();

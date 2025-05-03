@@ -71,6 +71,7 @@ public class InvestmentService {
         Investment investment = new Investment();
         investment.setPortfolio(portfolio); // Set from the found portfolio
         investment.setTicker(request.getTicker());
+        investment.setCurrentValue(getInvestmentCurrentValue(investment.getId()));
         investment.setType(request.getType());
         investment.setAmount(request.getAmount());
         investment.setPurchasePrice(request.getPurchasePrice());
@@ -154,11 +155,25 @@ public class InvestmentService {
 
     /**
      * Deletes an investment by its ID.
+     * Changed: Updates status to DELETED instead of hard delete.
      *
-     * @param id The ID of the investment to delete.
+     * @param id The ID of the investment to mark as deleted.
+     * @return true if the investment was found and updated, false otherwise.
      */
-    public void deleteInvestment(UUID id) {
-        investmentRepository.deleteById(id);
+    @Transactional // Ensure this is transactional
+    public boolean deleteInvestment(UUID id) {
+        Optional<Investment> investmentOpt = investmentRepository.findById(id);
+        if (investmentOpt.isPresent()) {
+            Investment investment = investmentOpt.get();
+            investment.setStatus(StatusInvestment.DELETED); // Set status
+            investment.setLastUpdateDate(LocalDateTime.now()); // Update timestamp
+            investmentRepository.save(investment); // Save the change
+            logger.info("Marked investment {} as DELETED.", id);
+            return true;
+        } else {
+            logger.warn("Investment {} not found for deletion (status update).", id);
+            return false;
+        }
     }
 
     /**
@@ -185,8 +200,8 @@ public class InvestmentService {
             throw new ResourceNotFoundException("Portfolio not found with id: " + portfolioId);
         }
 
-        // --- Fetch Investments --- // MODIFIED
-        logger.debug("Fetching investments directly from repository for portfolio ID: {}", portfolioId);
+        // --- Fetch Investments ---
+        logger.debug("Fetching investments for portfolio ID: {}", portfolioId);
         // Assuming Investment entity has a Portfolio field mapped correctly
         return investmentRepository.findByPortfolioId(portfolioId);
     }
@@ -263,6 +278,34 @@ public class InvestmentService {
         } else {
             logger.warn("Attempted to update current value for non-existent investment: {}", id);
             return null;
+        }
+    }
+
+    /**
+     * Marks an investment as SOLD.
+     *
+     * @param id The ID of the investment to mark as sold.
+     * @return The updated investment object with SOLD status, or null if not found.
+     */
+    @Transactional
+    public Investment sellInvestment(UUID id) {
+        Optional<Investment> investmentOpt = investmentRepository.findById(id);
+        if (investmentOpt.isPresent()) {
+            Investment investment = investmentOpt.get();
+            // Trim status from DB before comparing
+            if (investment.getStatus() != null && StatusInvestment.ACTIVE.equals(investment.getStatus().trim())) {
+                investment.setStatus(StatusInvestment.SOLD);
+                investment.setLastUpdateDate(LocalDateTime.now());
+                Investment soldInvestment = investmentRepository.save(investment);
+                logger.info("Marked investment {} as SOLD.", id);
+                return soldInvestment;
+            } else {
+                logger.warn("Attempted to sell investment {} which is not ACTIVE (Status: '{}'). Trimmed comparison failed.", id, investment.getStatus()); // Updated log message
+                return investment; // Return unchanged investment
+            }
+        } else {
+            logger.warn("Investment {} not found for selling.", id);
+            throw new ResourceNotFoundException("Investment not found with id: " + id);
         }
     }
 }

@@ -25,8 +25,8 @@ import {EditPortfolioDialogComponent} from '../portfolio/dialog/edit-portfolio-d
 import {ConfirmDeleteDialogComponent} from '../portfolio/dialog/confirm-delete-dialog.component';
 import {AddInvestmentDialogComponent} from './dialog/add-investment-dialog.component';
 import {EditInvestmentDialogComponent, EditInvestmentDialogResult} from './dialog/edit-investment-dialog.component';
+import {SellConfirmDialogComponent} from './dialog/sell-confirm-dialog.component';
 
-// Define the interface for aggregated data
 interface AggregatedInvestment {
   ticker: string;
   type: string;
@@ -54,7 +54,7 @@ interface AggregatedInvestment {
     MatDividerModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatExpansionModule
+    MatExpansionModule,
   ],
   templateUrl: './investments.component.html',
   styleUrls: ['./investments.component.css']
@@ -140,9 +140,11 @@ export class InvestmentsComponent implements OnInit {
     this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
       .pipe(finalize(() => this.isLoadingInvestments = false))
       .subscribe(investments => {
-        // Add percentProfit dynamically to each investment object
-        if (investments) {
-          investments.forEach((inv: any) => {
+        let activeInvestments = investments ? investments.filter(inv => inv.status === 'ACTIVE') : [];
+
+        // Add percentProfit dynamically to each *active* investment object
+        if (activeInvestments) {
+          activeInvestments.forEach((inv: any) => {
             const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
             const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
 
@@ -158,12 +160,12 @@ export class InvestmentsComponent implements OnInit {
           });
         }
 
-        this.investmentsForSelectedPortfolio = investments;
-        if (investments && investments.length > 0) {
-          console.log(`Loaded ${investments.length} individual investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
-          this.aggregateInvestments(investments);
+        this.investmentsForSelectedPortfolio = activeInvestments;
+        if (activeInvestments && activeInvestments.length > 0) {
+          console.log(`Loaded ${activeInvestments.length} individual investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
+          this.aggregateInvestments(activeInvestments);
           console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
-        } else if (investments) {
+        } else if (activeInvestments) {
           console.log(`No investments exist for portfolio ${this.selectedPortfolioId}`);
           this.aggregatedInvestments = [];
         } else {
@@ -431,18 +433,60 @@ export class InvestmentsComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(confirmed => {
       if (confirmed && investment.id) {
-        console.log(`Deletion confirmed for investment ID: ${investment.id}`);
+        console.log(`Marking investment DELETED: ${investment.id}`);
 
-        this.investmentService.deleteInvestment(String(investment.id)).subscribe(success => {
-          if (success) {
-            this.snackBar.open(`Investment '${investment.ticker}' deleted successfully.`, 'Close', { duration: 3000 });
-            this.loadInvestmentsForSelectedPortfolio();
-          } else {
-            console.error(`Failed to delete investment ${investment.id}`);
+        this.investmentService.deleteInvestment(String(investment.id)).subscribe({
+          next: (success) => {
+            if (success) {
+              this.snackBar.open(`Investment '${investment.ticker}' marked as deleted.`, 'Close', { duration: 3000 });
+              this.loadInvestmentsForSelectedPortfolio(); // Reload to filter out
+            } else {
+              console.error(`Failed to mark investment ${investment.id} as deleted.`);
+              this.snackBar.open(`Failed to mark investment as deleted.`, 'Close', { duration: 3000 });
+            }
+          },
+          error: (err) => {
+            console.error(`Error deleting investment ${investment.id}:`, err);
+            this.snackBar.open(`Error marking investment as deleted. ${err.message || ''}`, 'Close', { duration: 5000 });
           }
         });
       } else {
         console.log(`Deletion cancelled for investment ID: ${investment.id}`);
+      }
+    });
+  }
+
+  sellInvestment(investment: Investment): void {
+    if (!investment || !investment.id) {
+      this.snackBar.open('Cannot sell investment: Invalid data.', 'Close', { duration: 3000 });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(SellConfirmDialogComponent, {
+      width: '400px',
+      data: { investment: investment }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        console.log(`Sell confirmed for investment ID: ${investment.id}`);
+        this.investmentService.sellInvestment(String(investment.id))
+          .subscribe({
+            next: (soldInvestment) => {
+              if (soldInvestment) {
+                this.snackBar.open(`Investment '${soldInvestment.ticker}' marked as SOLD.`, 'Close', { duration: 3000 });
+                // Reload investments to reflect the status change (it will be filtered out)
+                this.loadInvestmentsForSelectedPortfolio();
+              } else {
+                console.error(`Sell operation failed for investment ${investment.id} (service returned null/unexpected).`);
+                this.snackBar.open(`Failed to mark investment as SOLD.`, 'Close', { duration: 3000 });
+              }
+            },
+            error: (err) => {
+              console.error(`Error selling investment ${investment.id}:`, err);
+              this.snackBar.open(`Error marking investment as SOLD. ${err.message || ''}`, 'Close', { duration: 5000 });
+            }
+          });
       }
     });
   }

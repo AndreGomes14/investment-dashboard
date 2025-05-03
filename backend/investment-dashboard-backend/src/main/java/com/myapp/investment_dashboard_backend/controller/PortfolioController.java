@@ -199,8 +199,11 @@ public class PortfolioController {
 
             return new ResponseEntity<>(excelData, headers, HttpStatus.OK);
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (Exception e) {
+            // Catch other potential exceptions (e.g., ResourceNotFound if portfolio doesn't exist)
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or more specific status
         }
     }
 }

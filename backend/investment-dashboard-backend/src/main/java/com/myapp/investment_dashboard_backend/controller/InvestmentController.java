@@ -4,7 +4,7 @@ import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentReq
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -17,7 +17,8 @@ public class InvestmentController {
 
     private final InvestmentService investmentService;
 
-    InvestmentController(InvestmentService investmentService) {
+    @Autowired
+    public InvestmentController(InvestmentService investmentService) {
         this.investmentService = investmentService;
     }
 
@@ -29,7 +30,7 @@ public class InvestmentController {
     @GetMapping
     public ResponseEntity<List<Investment>> getAllInvestments() {
         List<Investment> investments = investmentService.getAllInvestments();
-        return new ResponseEntity<>(investments, HttpStatus.OK);
+        return ResponseEntity.ok(investments);
     }
 
     /**
@@ -41,7 +42,8 @@ public class InvestmentController {
     @GetMapping("/{id}")
     public ResponseEntity<Investment> getInvestmentById(@PathVariable UUID id) {
         Optional<Investment> investment = investmentService.getInvestmentById(id);
-        return investment.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+        return investment.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
@@ -52,11 +54,13 @@ public class InvestmentController {
      * @return ResponseEntity containing the updated investment.
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Investment> updateInvestment(
-            @PathVariable UUID id,
-            @Valid @RequestBody UpdateInvestmentRequest request) {
-        Investment updatedInvestment = investmentService.updateInvestment(id, request);
-        return ResponseEntity.ok(updatedInvestment);
+    public ResponseEntity<Investment> updateInvestment(@PathVariable UUID id, @Valid @RequestBody UpdateInvestmentRequest request) {
+        try {
+            Investment updatedInvestment = investmentService.updateInvestment(id, request);
+            return ResponseEntity.ok(updatedInvestment);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
@@ -67,7 +71,27 @@ public class InvestmentController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteInvestment(@PathVariable UUID id) {
-        investmentService.deleteInvestment(id);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        boolean deleted = investmentService.deleteInvestment(id);
+        if (deleted) {
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Marks an investment as sold.
+     *
+     * @param id The ID of the investment to mark as sold.
+     * @return ResponseEntity containing the updated investment.
+     */
+    @PatchMapping("/{id}/sell")
+    public ResponseEntity<Investment> sellInvestment(@PathVariable UUID id) {
+        try {
+            Investment soldInvestment = investmentService.sellInvestment(id);
+            return ResponseEntity.ok(soldInvestment);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
