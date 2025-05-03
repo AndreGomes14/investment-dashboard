@@ -13,6 +13,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { HttpClient } from '@angular/common/http';
+import { saveAs } from 'file-saver';
 
 import { PortfolioService } from '../../services/portfolio.service';
 import { InvestmentService } from '../../services/investment.service';
@@ -23,7 +25,6 @@ import {EditPortfolioDialogComponent} from '../portfolio/dialog/edit-portfolio-d
 import {ConfirmDeleteDialogComponent} from '../portfolio/dialog/confirm-delete-dialog.component';
 import {AddInvestmentDialogComponent} from './dialog/add-investment-dialog.component';
 import {EditInvestmentDialogComponent, EditInvestmentDialogResult} from './dialog/edit-investment-dialog.component';
-import {MatTooltip} from '@angular/material/tooltip';
 
 // Define the interface for aggregated data
 interface AggregatedInvestment {
@@ -53,8 +54,7 @@ interface AggregatedInvestment {
     MatDividerModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatExpansionModule,
-    MatTooltip
+    MatExpansionModule
   ],
   templateUrl: './investments.component.html',
   styleUrls: ['./investments.component.css']
@@ -71,11 +71,20 @@ export class InvestmentsComponent implements OnInit {
   investmentsForSelectedPortfolio: Investment[] | null = null;
   aggregatedInvestments: AggregatedInvestment[] | null = null;
 
+  get selectedPortfolioName(): string {
+    if (!this.selectedPortfolioId || !this.portfolios) {
+      return 'Selected Portfolio'; // Default text
+    }
+    const selectedPortfolio = this.portfolios.find(p => p.id === this.selectedPortfolioId);
+    return selectedPortfolio ? selectedPortfolio.name : 'Selected Portfolio'; // Return name or default
+  }
+
   constructor(
     private readonly portfolioService: PortfolioService,
     private readonly investmentService: InvestmentService,
     private readonly dialog: MatDialog,
-    private readonly snackBar: MatSnackBar
+    private readonly snackBar: MatSnackBar,
+    private readonly http: HttpClient
   ) {}
 
   ngOnInit(): void {
@@ -434,6 +443,51 @@ export class InvestmentsComponent implements OnInit {
         });
       } else {
         console.log(`Deletion cancelled for investment ID: ${investment.id}`);
+      }
+    });
+  }
+
+  exportData(): void {
+    if (!this.selectedPortfolioId) {
+      this.snackBar.open('Please select a portfolio to export.', 'Close', { duration: 3000 });
+      return;
+    }
+
+    const exportUrl = `/api/portfolios/${this.selectedPortfolioId}/investments/export`;
+    const filename = `investments_${this.selectedPortfolioId}.xlsx`;
+
+    this.http.get(exportUrl, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        if (blob.size === 0) {
+          this.snackBar.open('Export failed: Received empty file.', 'Close', { duration: 3000 });
+          console.error('Export failed: Received empty blob.');
+          return;
+        }
+        saveAs(blob, filename);
+        this.snackBar.open('Export started successfully.', 'Close', { duration: 3000 });
+      },
+      error: (error) => {
+        console.error('Error exporting data:', error);
+        let message = 'Error exporting data. Please check backend logs.';
+        if (error.error instanceof Blob) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const errJson = JSON.parse(reader.result as string);
+              message = errJson.message || message;
+            } catch (e) { /* Ignore parsing error */ }
+            this.snackBar.open(message, 'Close', { duration: 5000 });
+          };
+          reader.onerror = () => {
+            this.snackBar.open(message, 'Close', { duration: 5000 });
+          };
+          reader.readAsText(error.error);
+        } else {
+          message = error.message || message;
+          this.snackBar.open(message, 'Close', { duration: 5000 });
+        }
       }
     });
   }

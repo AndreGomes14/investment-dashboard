@@ -57,11 +57,9 @@
           <mat-icon>add_circle</mat-icon>
           Add Investment
         </button>
-        <button mat-raised-button>
-          <mat-icon>auto renew</mat-icon>
-          Rebalanced
-        </button>
-        <button mat-raised-button>
+        <button mat-raised-button
+                (click)="exportData()"
+                [disabled]="!selectedPortfolioId">
           <mat-icon>download</mat-icon>
           Export Data
         </button>
@@ -70,7 +68,7 @@
 
     <div *ngIf="hasPortfolios && selectedPortfolioId">
       <div class="section">
-        <h2 class="section-title">Active Investments in [Selected Portfolio Name]</h2>
+        <h2 class="section-title">Active Investments in {{ selectedPortfolioName }}</h2>
 
         <!-- Investment Loading / No Data State -->
         <div *ngIf="isLoadingInvestments" class="loading-container">
@@ -141,10 +139,10 @@
                 <mat-divider></mat-divider>
                 <div class="individual-investment-list">
                   <div *ngFor="let investment of aggInvestment.individualInvestments" class="individual-item">
-                    <span>Amount: {{ investment.amount | number }}</span>
+                    <span>Units: {{ investment.amount | number }}</span>
                     <span>&#64; {{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</span>
                     <span>on {{ investment.createdAt | date:'shortDate' }}</span>
-                    <!-- Removed ID -->
+                    <div style="flex-grow: 1;"></div>
                     <button mat-icon-button class="individual-action-button" (click)="editInvestment(investment)" matTooltip="Edit this lot">
                       <mat-icon>edit_note</mat-icon>
                     </button>
@@ -176,7 +174,7 @@
                 <mat-card-content>
                   <div class="investment-data">
                     <div class="data-row">
-                      <span class="label">Amount:</span>
+                      <span class="label">Units:</span>
                       <span class="value">{{ investment.amount | number }}</span>
                     </div>
                     <div class="data-row">

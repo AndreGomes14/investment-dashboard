@@ -5,13 +5,18 @@ import com.myapp.investment_dashboard_backend.dto.portfolio.UpdatePortfolioReque
 import com.myapp.investment_dashboard_backend.model.Portfolio;
 import com.myapp.investment_dashboard_backend.model.User;
 import com.myapp.investment_dashboard_backend.service.PortfolioService;
+import com.myapp.investment_dashboard_backend.service.ExcelExportService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -27,11 +32,13 @@ public class PortfolioController {
 
     private final PortfolioService portfolioService;
     private final InvestmentService investmentService;
+    private final ExcelExportService excelExportService;
 
     @Autowired
-    public PortfolioController(PortfolioService portfolioService, InvestmentService investmentService) {
+    public PortfolioController(PortfolioService portfolioService, InvestmentService investmentService, ExcelExportService excelExportService) {
         this.portfolioService = portfolioService;
         this.investmentService = investmentService;
+        this.excelExportService = excelExportService;
     }
 
     /**
@@ -170,6 +177,31 @@ public class PortfolioController {
     public ResponseEntity<Void> deletePortfolio(@PathVariable UUID id) {
         portfolioService.deletePortfolio(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Exports investments for a specific portfolio to an Excel file.
+     * Handles GET /api/portfolios/{portfolioId}/investments/export
+     *
+     * @param portfolioId The ID of the portfolio whose investments are to be exported.
+     * @return ResponseEntity containing the Excel file bytes or an error status.
+     */
+    @GetMapping("/{portfolioId}/investments/export")
+    public ResponseEntity<byte[]> exportInvestmentsToExcel(@PathVariable UUID portfolioId) {
+        try {
+            List<Investment> investments = investmentService.getInvestmentsByPortfolioId(portfolioId);
+            byte[] excelData = excelExportService.createInvestmentExcel(investments);
+
+            String filename = "investments_" + portfolioId + ".xlsx";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData(filename, filename);
+
+            return new ResponseEntity<>(excelData, headers, HttpStatus.OK);
+
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }
 
