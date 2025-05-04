@@ -25,6 +25,7 @@ import java.util.UUID;
 import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import com.myapp.investment_dashboard_backend.dto.portfolio.PortfolioSummaryResponse;
 
 @RestController
 @RequestMapping("/api/portfolios")
@@ -189,6 +190,7 @@ public class PortfolioController {
     @GetMapping("/{portfolioId}/investments/export")
     public ResponseEntity<byte[]> exportInvestmentsToExcel(@PathVariable UUID portfolioId) {
         try {
+            // Optional: Add validation to check if portfolio exists and belongs to user
             List<Investment> investments = investmentService.getInvestmentsByPortfolioId(portfolioId);
             byte[] excelData = excelExportService.createInvestmentExcel(investments);
 
@@ -196,15 +198,42 @@ public class PortfolioController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             headers.setContentDispositionFormData(filename, filename);
+            // headers.setCacheControl("must-revalidate, post-check=0, pre-check=0"); // Optional cache control
 
             return new ResponseEntity<>(excelData, headers, HttpStatus.OK);
 
         } catch (IOException e) {
+            // Log error - Handled by GlobalExceptionHandler or re-throw
+            // For simplicity, returning internal server error directly here
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
             // Catch other potential exceptions (e.g., ResourceNotFound if portfolio doesn't exist)
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or more specific status
         }
+    }
+
+    /**
+     * Retrieves summary data for all portfolios of the current user.
+     * Handles GET /api/portfolios/summary
+     * @return ResponseEntity containing the overall PortfolioSummaryResponse.
+     */
+    @GetMapping("/summary")
+    public ResponseEntity<PortfolioSummaryResponse> getOverallPortfolioSummary() {
+        PortfolioSummaryResponse summary = portfolioService.getOverallSummary();
+        return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Retrieves summary data for a specific portfolio.
+     * Handles GET /api/portfolios/{id}/summary
+     * @param id The ID of the portfolio.
+     * @return ResponseEntity containing the PortfolioSummaryResponse for the specific portfolio.
+     */
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<PortfolioSummaryResponse> getPortfolioSummary(@PathVariable UUID id) {
+        // Service method already handles not found and access denied exceptions
+        PortfolioSummaryResponse summary = portfolioService.getPortfolioSummary(id);
+        return ResponseEntity.ok(summary);
     }
 }
 

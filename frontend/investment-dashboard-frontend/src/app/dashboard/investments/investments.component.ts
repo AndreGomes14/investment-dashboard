@@ -15,6 +15,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { HttpClient } from '@angular/common/http';
 import { saveAs } from 'file-saver';
+import { forkJoin, of } from 'rxjs';
+import { map, catchError as rxCatchError } from 'rxjs/operators';
 
 import { PortfolioService } from '../../services/portfolio.service';
 import { InvestmentService } from '../../services/investment.service';
@@ -66,19 +68,25 @@ export class InvestmentsComponent implements OnInit {
   isUpdatingPortfolio: boolean = false;
   isDeletingPortfolio: boolean = false;
   isLoadingInvestments: boolean = false;
-  hasPortfolios: boolean = false;
   portfolios: Portfolio[] | null = null;
   selectedPortfolioId: number | null = null;
   investmentsForSelectedPortfolio: Investment[] | null = null;
   soldInvestmentsForSelectedPortfolio: Investment[] | null = null;
   aggregatedInvestments: AggregatedInvestment[] | null = null;
 
+  get hasAnyPortfolios(): boolean {
+    return !!(this.portfolios && this.portfolios.length > 0);
+  }
+
   get selectedPortfolioName(): string {
-    if (!this.selectedPortfolioId || !this.portfolios) {
-      return 'Selected Portfolio'; // Default text
+    if (this.selectedPortfolioId === null) {
+      return 'All Portfolios';
+    }
+    if (!this.portfolios) {
+      return 'Selected Portfolio';
     }
     const selectedPortfolio = this.portfolios.find(p => p.id === this.selectedPortfolioId);
-    return selectedPortfolio ? selectedPortfolio.name : 'Selected Portfolio'; // Return name or default
+    return selectedPortfolio ? selectedPortfolio.name : 'Selected Portfolio';
   }
 
   constructor(
@@ -108,158 +116,113 @@ export class InvestmentsComponent implements OnInit {
       .subscribe({
         next: (portfolios) => {
           this.portfolios = portfolios;
-          this.hasPortfolios = !!(this.portfolios && this.portfolios.length > 0);
-          if (this.hasPortfolios && this.portfolios) {
-            if (this.portfolios.length === 1 && this.portfolios[0].id) {
-              this.selectedPortfolioId = this.portfolios[0].id;
-              this.loadInvestmentsForSelectedPortfolio();
-            }
-          } else {
-            this.selectedPortfolioId = null;
-          }
+          this.loadDataForSelection();
         },
         error: (error) => {
-          this.hasPortfolios = false;
           this.selectedPortfolioId = null;
+          this.portfolios = [];
+          this.loadDataForSelection();
         }
       });
   }
 
   onPortfolioSelected(): void {
-    console.log('Portfolio selected:', this.selectedPortfolioId);
-    this.investmentsForSelectedPortfolio = null;
-    if (this.selectedPortfolioId) {
-      this.loadInvestmentsForSelectedPortfolio();
-    }
+    console.log('Portfolio selected (null means All): ', this.selectedPortfolioId);
+    this.loadDataForSelection();
   }
 
-  loadInvestmentsForSelectedPortfolio(): void {
-    if (!this.selectedPortfolioId) return;
-
+  loadDataForSelection(): void {
     this.isLoadingInvestments = true;
     this.investmentsForSelectedPortfolio = null;
     this.soldInvestmentsForSelectedPortfolio = null;
     this.aggregatedInvestments = null;
 
-    this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
-      .pipe(finalize(() => this.isLoadingInvestments = false))
-      .subscribe(allInvestments => {
-        if (!allInvestments) {
-          console.log(`Failed to load investments for portfolio ${this.selectedPortfolioId}`);
-          this.investmentsForSelectedPortfolio = [];
-          this.soldInvestmentsForSelectedPortfolio = [];
-          this.aggregatedInvestments = [];
-          return;
-        }
-
-        // Filter into ACTIVE and SOLD lists
-        const activeInvestments = allInvestments.filter(inv => inv.status === 'ACTIVE');
-        const soldInvestments = allInvestments.filter(inv => inv.status === 'SOLD');
-
-        // Calculate profit for active investments
-        activeInvestments.forEach((inv: any) => {
-          const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
-          const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
-
-          if (totalCurrentValue !== null && totalPurchaseCost > 0) {
-            inv.percentProfit = (totalCurrentValue - totalPurchaseCost) / totalPurchaseCost;
-          } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue > 0) {
-            inv.percentProfit = Infinity;
-          } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue === 0) {
-            inv.percentProfit = 0;
-          } else {
-            inv.percentProfit = null;
-          }
+    if (this.selectedPortfolioId !== null) {
+      this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
+        .pipe(finalize(() => this.isLoadingInvestments = false))
+        .subscribe(allInvestments => {
+          this.processInvestments(allInvestments);
         });
-        // Calculate realized profit for SOLD investments
-        soldInvestments.forEach((inv: any) => {
-          if (inv.sellPrice !== null && inv.sellPrice !== undefined &&
-            inv.purchasePrice !== null && inv.purchasePrice !== undefined &&
-            inv.amount !== null && inv.amount !== undefined) {
-            inv.realizedPnl = (inv.sellPrice - inv.purchasePrice) * inv.amount;
-          } else {
-            inv.realizedPnl = null; // Cannot calculate if data is missing
-          }
+    } else {
+      if (!this.portfolios || this.portfolios.length === 0) {
+        console.log("No portfolios found to load investments from.");
+        this.processInvestments([]);
+        this.isLoadingInvestments = false;
+        return;
+      }
+
+      const portfolioInvestmentRequests = this.portfolios
+        .filter(portfolio => portfolio.id !== undefined)
+        .map(portfolio =>
+          this.investmentService.getInvestmentsByPortfolioId(portfolio.id!)
+            .pipe(
+              rxCatchError(err => {
+                console.error(`Failed to load investments for portfolio ${portfolio.id}:`, err);
+                return of([]);
+              }),
+              map(investments => investments || [])
+            )
+        );
+
+      forkJoin(portfolioInvestmentRequests)
+        .pipe(finalize(() => this.isLoadingInvestments = false))
+        .subscribe((resultsArray: Investment[][]) => {
+          const allInvestments = resultsArray.flat();
+          console.log(`Loaded a total of ${allInvestments.length} investments across all portfolios.`);
+          this.processInvestments(allInvestments);
         });
-
-        this.investmentsForSelectedPortfolio = activeInvestments;
-        this.soldInvestmentsForSelectedPortfolio = soldInvestments;
-
-        if (activeInvestments && activeInvestments.length > 0) {
-          console.log(`Loaded ${activeInvestments.length} ACTIVE investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
-          this.aggregateInvestments(activeInvestments);
-          console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
-        } else {
-          console.log(`No ACTIVE investments exist for portfolio ${this.selectedPortfolioId}`);
-          this.aggregatedInvestments = [];
-        }
-        console.log(`Found ${soldInvestments.length} SOLD investments for portfolio ${this.selectedPortfolioId}.`);
-      });
+    }
   }
 
-  private aggregateInvestments(investments: Investment[]): void {
-    const groups = new Map<string, AggregatedInvestment>();
-
-    for (const investment of investments) {
-      if (!investment.ticker) continue;
-
-      const key = (investment.ticker || '').trim().toUpperCase();
-      let group = groups.get(key);
-
-      if (!group) {
-        group = {
-          ticker: investment.ticker,
-          type: investment.type || 'N/A',
-          currency: investment.currency || 'N/A',
-          totalAmount: 0,
-          averagePurchasePrice: 0,
-          totalPurchaseCost: 0,
-          totalCurrentValue: 0,
-          percentProfit: null,
-          individualInvestments: []
-        };
-        groups.set(key, group);
-      }
-
-      const purchaseCost = (investment.amount ?? 0) * (investment.purchasePrice ?? 0);
-      group.totalAmount += (investment.amount ?? 0);
-      group.totalPurchaseCost += purchaseCost;
-
-      if (investment.currentValue != null) {
-        const currentVal = (investment.amount ?? 0) * investment.currentValue;
-        group.totalCurrentValue = (group.totalCurrentValue ?? 0) + currentVal;
-      } else {
-        group.totalCurrentValue = null;
-      }
-
-      group.individualInvestments.push(investment);
+  processInvestments(allInvestments: Investment[] | null): void {
+    if (!allInvestments) {
+      console.log("Investment list is null or undefined after fetch.");
+      this.investmentsForSelectedPortfolio = [];
+      this.soldInvestmentsForSelectedPortfolio = [];
+      this.aggregatedInvestments = [];
+      return;
     }
 
-    this.aggregatedInvestments = Array.from(groups.values()).map(group => {
-      if (group.totalAmount > 0) {
-        group.averagePurchasePrice = group.totalPurchaseCost / group.totalAmount;
-      } else {
-        group.averagePurchasePrice = 0;
-      }
-      return group;
-    });
+    const activeInvestments = allInvestments.filter(inv => inv.status === 'ACTIVE');
+    const soldInvestments = allInvestments.filter(inv => inv.status === 'SOLD');
 
-    // Calculate percentProfit after average price
-    this.aggregatedInvestments.forEach(group => {
-      if (group.totalCurrentValue !== null && group.totalPurchaseCost > 0) {
-        group.percentProfit = ((group.totalCurrentValue - group.totalPurchaseCost) / group.totalPurchaseCost);
-      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue > 0) {
-        // Handle case where cost is zero but value is positive (e.g., free shares)
-        group.percentProfit = Infinity;
-      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue === 0) {
-        group.percentProfit = 0; // Cost and value are zero
+    activeInvestments.forEach((inv: any) => {
+      const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
+      const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
+
+      if (totalCurrentValue !== null && totalPurchaseCost > 0) {
+        inv.percentProfit = (totalCurrentValue - totalPurchaseCost) / totalPurchaseCost;
+      } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue > 0) {
+        inv.percentProfit = Infinity;
+      } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue === 0) {
+        inv.percentProfit = 0;
       } else {
-        // Cannot calculate if currentValue is null or if cost is negative/invalid (though cost shouldn't be negative here)
-        group.percentProfit = null;
+        inv.percentProfit = null;
       }
     });
+    soldInvestments.forEach((inv: any) => {
+      if (inv.sellPrice !== null && inv.sellPrice !== undefined &&
+        inv.purchasePrice !== null && inv.purchasePrice !== undefined &&
+        inv.amount !== null && inv.amount !== undefined) {
+        inv.realizedPnl = (inv.sellPrice - inv.purchasePrice) * inv.amount;
+      } else {
+        inv.realizedPnl = null;
+      }
+    });
 
-    this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));
+    this.investmentsForSelectedPortfolio = activeInvestments;
+    this.soldInvestmentsForSelectedPortfolio = soldInvestments;
+
+    if (activeInvestments && activeInvestments.length > 0) {
+      const portfolioIdentifier = this.selectedPortfolioId ?? 'all';
+      console.log(`Aggregating ${activeInvestments.length} ACTIVE investments for portfolio ${portfolioIdentifier}.`);
+      this.aggregateInvestments(activeInvestments);
+      console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
+    } else {
+      console.log(`No ACTIVE investments to aggregate for the current selection.`);
+      this.aggregatedInvestments = [];
+    }
+    console.log(`Found ${soldInvestments.length} SOLD investments for the current selection.`);
   }
 
   createPortfolio() {
@@ -277,7 +240,6 @@ export class InvestmentsComponent implements OnInit {
             if (createdPortfolio && createdPortfolio.id) {
               this.snackBar.open(`Portfolio '${createdPortfolio.name}' created successfully!`, 'Close', { duration: 3000 });
               this.portfolios = this.portfolios ? [...this.portfolios, createdPortfolio] : [createdPortfolio];
-              this.hasPortfolios = true;
               this.selectedPortfolioId = createdPortfolio.id;
               this.onPortfolioSelected();
             }
@@ -395,7 +357,7 @@ export class InvestmentsComponent implements OnInit {
           .subscribe(createdInvestment => {
             if (createdInvestment) {
               this.snackBar.open(`Investment '${createdInvestment.ticker}' added successfully!`, 'Close', { duration: 3000 });
-              this.loadInvestmentsForSelectedPortfolio();
+              this.loadDataForSelection();
             } else {
               console.log('Investment creation failed (service returned null).');
             }
@@ -427,7 +389,7 @@ export class InvestmentsComponent implements OnInit {
           .subscribe(updatedInvestment => {
             if (updatedInvestment) {
               this.snackBar.open(`Investment '${updatedInvestment.ticker}' updated successfully!`, 'Close', { duration: 3000 });
-              this.loadInvestmentsForSelectedPortfolio();
+              this.loadDataForSelection();
             } else {
               console.error('Investment update failed (service returned null).');
             }
@@ -462,7 +424,7 @@ export class InvestmentsComponent implements OnInit {
           next: (success) => {
             if (success) {
               this.snackBar.open(`Investment '${investment.ticker}' marked as deleted.`, 'Close', { duration: 3000 });
-              this.loadInvestmentsForSelectedPortfolio(); // Reload to filter out
+              this.loadDataForSelection();
             } else {
               console.error(`Failed to mark investment ${investment.id} as deleted.`);
               this.snackBar.open(`Failed to mark investment as deleted.`, 'Close', { duration: 3000 });
@@ -501,7 +463,7 @@ export class InvestmentsComponent implements OnInit {
             next: (soldInvestment) => {
               if (soldInvestment) {
                 this.snackBar.open(`Investment '${soldInvestment.ticker}' marked as SOLD.`, 'Close', { duration: 3000 });
-                this.loadInvestmentsForSelectedPortfolio();
+                this.loadDataForSelection();
               } else {
                 console.error(`Sell operation failed for investment ${investment.id} (service returned null/unexpected).`);
               }
@@ -559,5 +521,70 @@ export class InvestmentsComponent implements OnInit {
         }
       }
     });
+  }
+
+  private aggregateInvestments(investments: Investment[]): void {
+    const groups = new Map<string, AggregatedInvestment>();
+
+    for (const investment of investments) {
+      if (!investment.ticker) continue;
+
+      const key = (investment.ticker || '').trim().toUpperCase();
+      let group = groups.get(key);
+
+      if (!group) {
+        group = {
+          ticker: investment.ticker,
+          type: investment.type || 'N/A',
+          currency: investment.currency || 'N/A',
+          totalAmount: 0,
+          averagePurchasePrice: 0,
+          totalPurchaseCost: 0,
+          totalCurrentValue: 0,
+          percentProfit: null,
+          individualInvestments: []
+        };
+        groups.set(key, group);
+      }
+
+      const purchaseCost = (investment.amount ?? 0) * (investment.purchasePrice ?? 0);
+      group.totalAmount += (investment.amount ?? 0);
+      group.totalPurchaseCost += purchaseCost;
+
+      if (investment.currentValue != null) {
+        const currentVal = (investment.amount ?? 0) * investment.currentValue;
+        group.totalCurrentValue = (group.totalCurrentValue ?? 0) + currentVal;
+      } else {
+        group.totalCurrentValue = null;
+      }
+
+      group.individualInvestments.push(investment);
+    }
+
+    this.aggregatedInvestments = Array.from(groups.values()).map(group => {
+      if (group.totalAmount > 0) {
+        group.averagePurchasePrice = group.totalPurchaseCost / group.totalAmount;
+      } else {
+        group.averagePurchasePrice = 0;
+      }
+      return group;
+    });
+
+    // Calculate percentProfit after average price
+    this.aggregatedInvestments.forEach(group => {
+      if (group.totalCurrentValue !== null && group.totalPurchaseCost > 0) {
+        group.percentProfit = ((group.totalCurrentValue - group.totalPurchaseCost) / group.totalPurchaseCost);
+      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue > 0) {
+        // Handle case where cost is zero but value is positive (e.g., free shares)
+        group.percentProfit = Infinity;
+      } else if (group.totalCurrentValue !== null && group.totalPurchaseCost === 0 && group.totalCurrentValue === 0) {
+        group.percentProfit = 0; // Cost and value are zero
+      } else {
+        // Cannot calculate if currentValue is null or if cost is negative/invalid (though cost shouldn't be negative here)
+        group.percentProfit = null;
+      }
+    });
+
+    this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));
   }
 }

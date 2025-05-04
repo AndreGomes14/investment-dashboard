@@ -1,19 +1,22 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { forkJoin } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { RouterLink, ActivatedRoute, ParamMap } from '@angular/router';
+import { Subscription, switchMap, of, tap, finalize } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 
-import { PortfolioService } from '../../services/portfolio.service';
-import { InvestmentService } from '../../services/investment.service';
-import { Portfolio } from '../../model/portfolio.model';
+import { PortfolioService, PortfolioSummaryResponse, PortfolioSummaryMetrics, InvestmentPerformance } from '../../services/portfolio.service';
 import { Investment } from '../../model/investment.model';
-import {RouterLink} from '@angular/router';
+
+interface ChartDataPoint {
+  name: string;
+  value: number;
+}
 
 @Component({
   selector: 'app-portfolio',
@@ -25,110 +28,101 @@ import {RouterLink} from '@angular/router';
     MatButtonModule,
     MatTableModule,
     MatProgressSpinnerModule,
-    RouterLink
+    RouterLink,
+    NgxChartsModule
   ],
   templateUrl: './portfolio.component.html',
   styleUrls: ['./portfolio.component.css']
 })
-export class PortfolioComponent implements OnInit {
+export class PortfolioComponent implements OnInit, OnDestroy {
   isLoading: boolean = true;
-  hasPortfolioData: boolean = false;
-  portfolios: Portfolio[] | null = null;
-  investments: Investment[] | null = null;
+  portfolioSummaryData: PortfolioSummaryResponse | null = null;
+  allocationChartData: ChartDataPoint[] = [];
+  allocationColorScheme: Color = {
+    name: 'portfolioAllocation',
+    selectable: true,
+    group: ScaleType.Ordinal,
+    domain: ['#3949ab', '#43a047', '#ff9800', '#e53935', '#5e35b1', '#039be5']
+  };
+  private routeSubscription: Subscription | undefined;
 
-  totalPortfolioValue: number = 0;
-  totalGainLoss: number = 0;
-  totalGainLossPercentage: number = 0;
+  get summaryMetrics(): PortfolioSummaryMetrics | null {
+    return this.portfolioSummaryData?.summary ?? null;
+  }
+  get activeHoldings(): Investment[] | null {
+    return this.portfolioSummaryData?.activeInvestments ?? null;
+  }
+  get soldHoldings(): Investment[] | null {
+    return this.portfolioSummaryData?.soldInvestments ?? null;
+  }
+  get hasPortfolioData(): boolean {
+    return !!this.portfolioSummaryData;
+  }
 
   constructor(
     private readonly portfolioService: PortfolioService,
-    private readonly investmentService: InvestmentService,
-    private readonly snackBar: MatSnackBar
+    private readonly snackBar: MatSnackBar,
+    private readonly route: ActivatedRoute,
+    private readonly zone: NgZone,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
-    this.loadData();
-  }
-
-  loadData(showLoading: boolean = true): void {
-    if (showLoading) {
-      this.isLoading = true;
-    }
-    // Reset metrics
-    this.resetMetrics();
-
-    forkJoin({
-      portfolios: this.portfolioService.getUserPortfolios(),
-      investments: this.investmentService.getAllInvestments()
-    }).pipe(
-      finalize(() => { if (showLoading) { this.isLoading = false; } })
-    ).subscribe({
-      next: (results) => {
-        this.portfolios = results.portfolios;
-        this.investments = results.investments;
-        this.hasPortfolioData = !!this.portfolios && this.portfolios.length > 0;
-
-        if (this.hasPortfolioData && this.investments) {
-          console.log('Portfolio data loaded:', this.portfolios);
-          console.log('Investments loaded:', this.investments);
-          // Calculate metrics only if we have investments
-          this.calculateMetrics();
+    this.routeSubscription = this.route.paramMap.pipe(
+      tap(() => {
+        this.isLoading = true;
+        this.portfolioSummaryData = null;
+      }),
+      switchMap((params: ParamMap) => {
+        const portfolioId = params.get('id');
+        if (portfolioId) {
+          console.log(`PortfolioComponent: Loading summary for specific portfolio ID: ${portfolioId}`);
+          return this.portfolioService.getPortfolioSummary(Number(portfolioId));
         } else {
-          console.log('No portfolio or no investments found.');
+          console.log(`PortfolioComponent: Loading overall summary.`);
+          return this.portfolioService.getOverallSummary();
+        }
+      }),
+      finalize(() => {
+        console.log("Finalizing summary load, ensuring isLoading=false within NgZone");
+        this.zone.run(() => {
+          this.isLoading = false;
+          this.cdr.detectChanges();
+        });
+      })
+    ).subscribe({
+      next: (summaryData) => {
+        this.portfolioSummaryData = summaryData;
+        if (!summaryData) {
+          console.log('PortfolioComponent: Received null summary data.');
+          this.allocationChartData = [];
+        } else {
+          console.log('PortfolioComponent: Summary data loaded:', this.portfolioSummaryData);
+          this.formatAllocationDataForChart();
         }
       },
       error: (error) => {
-        console.error('Error loading portfolio overview data:', error);
-        this.snackBar.open('Failed to load portfolio data. Please try again later.', 'Close', { duration: 3000 });
-        this.hasPortfolioData = false;
-        this.portfolios = null;
-        this.investments = null;
-        this.resetMetrics();
+        console.error('Error loading portfolio summary data in component:', error);
+        this.portfolioSummaryData = null;
       }
     });
   }
 
-  resetMetrics(): void {
-    this.totalPortfolioValue = 0;
-    this.totalGainLoss = 0;
-    this.totalGainLossPercentage = 0;
+  ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
   }
 
-  calculateMetrics(): void {
-    if (!this.investments || this.investments.length === 0) {
-      this.resetMetrics();
+  private formatAllocationDataForChart(): void {
+    if (!this.summaryMetrics?.assetAllocationByValue) {
+      this.allocationChartData = [];
       return;
     }
 
-    let totalInitialValue = 0;
-    let currentTotalValue = 0;
-
-    for (const investment of this.investments) {
-      // Ensure values are numbers
-      const purchasePrice = Number(investment.purchasePrice) || 0;
-      const amount = Number(investment.amount) || 0;
-      const currentValuePerUnit = Number(investment.currentValue) || purchasePrice; // Use purchase price if current value missing
-
-      const initialValue = purchasePrice * amount;
-      const currentValueTotal = currentValuePerUnit * amount;
-
-      totalInitialValue += initialValue;
-      currentTotalValue += currentValueTotal;
-    }
-
-    this.totalPortfolioValue = currentTotalValue;
-    this.totalGainLoss = currentTotalValue - totalInitialValue;
-
-    if (totalInitialValue > 0) {
-      this.totalGainLossPercentage = (this.totalGainLoss / totalInitialValue) * 100;
-    } else {
-      this.totalGainLossPercentage = 0;
-    }
-
-    console.log('Calculated Metrics:', {
-      totalValue: this.totalPortfolioValue,
-      gainLoss: this.totalGainLoss,
-      gainLossPercent: this.totalGainLossPercentage
-    });
+    this.allocationChartData = Object.entries(this.summaryMetrics.assetAllocationByValue)
+      .map(([key, value]) => ({
+        name: key,
+        value: value
+      }));
+    console.log('Formatted Chart Data:', this.allocationChartData);
   }
 }

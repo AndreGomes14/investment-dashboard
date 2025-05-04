@@ -15,38 +15,51 @@
   </mat-card>
 </div>
 
-<div class="portfolio-container" *ngIf="!isLoading && hasPortfolioData">
+<div class="portfolio-container" *ngIf="!isLoading && hasPortfolioData && summaryMetrics">
   <div class="page-header">
     <h1>Portfolio Overview</h1>
-    <p class="subtitle" *ngIf="portfolios && portfolios.length > 0">{{ portfolios[0].name }}</p>
+    <p class="subtitle">{{ summaryMetrics.portfolioName }}</p>
   </div>
 
   <div class="metrics-row">
     <mat-card class="metric-card">
       <mat-card-header>
-        <mat-icon mat-card-avatar class="metric-icon">account_balance</mat-icon>
+        <mat-icon mat-card-avatar class="metric-icon">account_balance_wallet</mat-icon>
         <mat-card-title>Total Value</mat-card-title>
-        <mat-card-subtitle>Current Holdings</mat-card-subtitle>
+        <mat-card-subtitle>Active Holdings</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <h2 class="metric-value">{{ totalPortfolioValue | currency:'USD':'symbol':'1.2-2' }}</h2>
+        <h2 class="metric-value">{{ summaryMetrics.totalValue | currency:'USD':'symbol':'1.2-2' }}</h2>
       </mat-card-content>
     </mat-card>
 
     <mat-card class="metric-card">
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">trending_up</mat-icon>
-        <mat-card-title>Total Gain/Loss</mat-card-title>
-        <mat-card-subtitle>Overall Return</mat-card-subtitle>
+        <mat-card-title>Unrealized Gain/Loss</mat-card-title>
+        <mat-card-subtitle>Return on Active Holdings</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <h2 class="metric-value" [ngClass]="totalGainLoss >= 0 ? 'positive' : 'negative'">
-          {{ totalGainLoss | currency:'USD':'symbol':'1.2-2' }}
+        <h2 class="metric-value" [ngClass]="summaryMetrics.unrealizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
+          {{ summaryMetrics.unrealizedPnlAbsolute | currency:'USD':'symbol':'1.2-2' }}
         </h2>
-        <div class="metric-change" [ngClass]="totalGainLoss >= 0 ? 'positive' : 'negative'">
-          <mat-icon>{{ totalGainLoss >= 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-          <span>{{ totalGainLossPercentage | number:'1.1-2' }}% overall</span>
+        <div class="metric-change" [ngClass]="summaryMetrics.unrealizedPnlPercentage >= 0 ? 'positive' : 'negative'">
+          <mat-icon>{{ summaryMetrics.unrealizedPnlPercentage >= 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+          <span>{{ summaryMetrics.unrealizedPnlPercentage | number:'1.1-2' }}% unrealized</span>
         </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="metric-card">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="metric-icon">paid</mat-icon>
+        <mat-card-title>Realized Gain/Loss</mat-card-title>
+        <mat-card-subtitle>From Sold Holdings</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <h2 class="metric-value" [ngClass]="summaryMetrics.realizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
+          {{ summaryMetrics.realizedPnlAbsolute | currency:'USD':'symbol':'1.2-2' }}
+        </h2>
       </mat-card-content>
     </mat-card>
 
@@ -54,63 +67,107 @@
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">pie_chart</mat-icon>
         <mat-card-title>Asset Allocation</mat-card-title>
-        <mat-card-subtitle>Current Distribution</mat-card-subtitle>
+        <mat-card-subtitle>By Current Value</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        <div class="allocation-chart">
-          <div class="allocation-item" style="width: 65%; background-color: #3949ab;">
-            <span>Stocks: 65%</span>
-          </div>
-          <div class="allocation-item" style="width: 20%; background-color: #43a047;">
-            <span>Bonds: 20%</span>
-          </div>
-          <div class="allocation-item" style="width: 10%; background-color: #ff9800;">
-            <span>Cash: 10%</span>
-          </div>
-          <div class="allocation-item" style="width: 5%; background-color: #e53935;">
-            <span>Other: 5%</span>
-          </div>
+        <!-- ngx-charts Pie Chart -->
+        <div *ngIf="allocationChartData && allocationChartData.length > 0" style="height: 200px;"> <!-- Set height for chart container -->
+          <ngx-charts-pie-chart
+            [results]="allocationChartData"
+            [legend]="false"
+            [labels]="true"
+            [doughnut]="true"
+            [arcWidth]="0.25"
+            [scheme]="allocationColorScheme" >
+          </ngx-charts-pie-chart>
+        </div>
+        <div *ngIf="!allocationChartData || allocationChartData.length === 0" class="allocation-chart-placeholder">
+          No allocation data available.
         </div>
       </mat-card-content>
     </mat-card>
   </div>
 
-  <div class="holdings-section">
+  <div class="holdings-section" *ngIf="activeHoldings && activeHoldings.length > 0">
     <div class="section-header">
-      <h2>Your Holdings</h2>
+      <h2>Active Holdings ({{ summaryMetrics.activeInvestmentsCount }})</h2>
       <button mat-raised-button color="primary" routerLink="../investments">
-        <mat-icon>add</mat-icon>
-        Manage Investments
+        <mat-icon>settings</mat-icon> Manage Investments
       </button>
     </div>
-
-    <mat-card *ngIf="!investments || investments.length === 0">
-      <mat-card-content>
-        <p class="info-message">No investments found in this portfolio. Go to 'Investment Management' to add some.</p>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card *ngIf="investments && investments.length > 0">
+    <mat-card>
       <div class="table-responsive">
         <table class="holdings-table">
           <thead>
           <tr>
             <th>Asset (Ticker)</th>
             <th>Type</th>
-            <th>Amount</th>
+            <th>Units</th>
             <th>Purchase Price</th>
-            <th>Current Value</th>
+            <th>Current Price</th>
             <th>Total Value</th>
+            <th>Profit %</th>
           </tr>
           </thead>
           <tbody>
-          <tr *ngFor="let investment of investments">
+          <tr *ngFor="let investment of activeHoldings">
             <td>{{ investment.ticker }}</td>
             <td>{{ investment.type }}</td>
-            <td>{{ investment.amount | number }}</td>
+            <td>{{ investment.amount | number:'1.0-4' }}</td>
             <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
             <td>{{ (investment.currentValue ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
             <td>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+            <td>
+                 <span class="profit-value"
+                       *ngIf="investment.percentProfit !== null"
+                       [class.positive]="(investment.percentProfit ?? 0) > 0"
+                       [class.negative]="(investment.percentProfit ?? 0) < 0">
+                    {{ investment.percentProfit | percent:'1.2-2' }}
+                 </span>
+              <span class="unavailable" *ngIf="investment.percentProfit === null">N/A</span>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </mat-card>
+  </div>
+
+  <div class="holdings-section" *ngIf="soldHoldings && soldHoldings.length > 0">
+    <div class="section-header">
+      <h2>Sold Holdings History</h2>
+    </div>
+    <mat-card>
+      <div class="table-responsive">
+        <table class="holdings-table">
+          <thead>
+          <tr>
+            <th>Asset (Ticker)</th>
+            <th>Type</th>
+            <th>Units</th>
+            <th>Purchase Price</th>
+            <th>Sell Price</th>
+            <th>Date Sold</th>
+            <th>Realized PnL</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let investment of soldHoldings">
+            <td>{{ investment.ticker }}</td>
+            <td>{{ investment.type }}</td>
+            <td>{{ investment.amount | number:'1.0-4' }}</td>
+            <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
+            <td>{{ (investment.sellPrice ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+            <td>{{ investment.lastUpdateDate | date:'shortDate' }}</td>
+            <td>
+                 <span class="profit-value"
+                       *ngIf="investment.realizedPnl !== null"
+                       [class.positive]="(investment.realizedPnl ?? 0) > 0"
+                       [class.negative]="(investment.realizedPnl ?? 0) < 0">
+                    {{ investment.realizedPnl | currency:investment.currency:'symbol':'1.2-2' }}
+                 </span>
+              <span class="unavailable" *ngIf="investment.realizedPnl === null">N/A</span>
+            </td>
           </tr>
           </tbody>
         </table>

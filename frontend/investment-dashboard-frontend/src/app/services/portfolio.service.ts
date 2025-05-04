@@ -5,27 +5,34 @@ import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { Portfolio } from '../model/portfolio.model';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Investment } from '../model/investment.model';
 
-export interface PortfolioSummary {
+// Define interfaces matching backend DTOs
+export interface InvestmentPerformance {
+  ticker: string;
+  type: string;
+  unrealizedPnlPercentage: number;
+  currentValue: number; // Current value per unit
+  holdingValue: number; // Total current value of the holding
+}
+
+export interface PortfolioSummaryMetrics {
+  portfolioName: string;
   totalValue: number;
-  allocation: {
-    stocks: number;
-    bonds: number;
-    cash: number;
-    alternative?: number;
-  };
-  performance: {
-    oneMonth: number;
-    threeMonths: number;
-    ytd: number;
-    oneYear: number;
-  };
-  latestTransactions?: Array<{
-    date: Date;
-    type: string;
-    asset: string;
-    amount: number;
-  }>;
+  totalCostBasis: number;
+  unrealizedPnlAbsolute: number;
+  unrealizedPnlPercentage: number;
+  realizedPnlAbsolute: number;
+  assetAllocationByValue: { [key: string]: number }; // Map<string, number>
+  activeInvestmentsCount: number;
+  bestPerformer: InvestmentPerformance | null;
+  worstPerformer: InvestmentPerformance | null;
+}
+
+export interface PortfolioSummaryResponse {
+  summary: PortfolioSummaryMetrics;
+  activeInvestments: Investment[];
+  soldInvestments: Investment[];
 }
 
 @Injectable({
@@ -33,23 +40,38 @@ export interface PortfolioSummary {
 })
 export class PortfolioService {
   private readonly portfolioApiUrl = environment.apiUrl + '/api/portfolios';
-  private readonly summaryApiUrl = environment.apiUrl + '/api/portfolio/summary';
 
   constructor(private readonly http: HttpClient, private readonly snackBar: MatSnackBar) { }
 
   /**
-   * Get portfolio summary data.
-   * Returns null if the API call fails.
-   * @returns Observable of portfolio summary or null.
+   * Get overall portfolio summary data.
+   * @returns Observable of PortfolioSummaryResponse or null.
    */
-  getPortfolioSummary(): Observable<PortfolioSummary | null> {
-    return this.http.get<PortfolioSummary>(this.summaryApiUrl)
-      .pipe(
-        catchError((error: HttpErrorResponse) => {
-          console.error('Error fetching portfolio summary:', error);
-          return of(null);
-        })
-      );
+  getOverallSummary(): Observable<PortfolioSummaryResponse | null> {
+    const url = `${this.portfolioApiUrl}/summary`;
+    return this.http.get<PortfolioSummaryResponse>(url).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error('Error fetching overall portfolio summary:', error);
+        this.snackBar.open('Failed to load overall portfolio summary.', 'Close', { duration: 3000 });
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Get summary data for a specific portfolio.
+   * @param portfolioId The ID of the portfolio.
+   * @returns Observable of PortfolioSummaryResponse or null.
+   */
+  getPortfolioSummary(portfolioId: number): Observable<PortfolioSummaryResponse | null> {
+    const url = `${this.portfolioApiUrl}/${portfolioId}/summary`;
+    return this.http.get<PortfolioSummaryResponse>(url).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error fetching summary for portfolio ${portfolioId}:`, error);
+        this.snackBar.open(`Failed to load summary for portfolio.`, 'Close', { duration: 3000 });
+        return of(null);
+      })
+    );
   }
 
   /**
