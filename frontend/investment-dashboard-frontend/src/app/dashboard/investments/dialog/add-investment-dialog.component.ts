@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { of, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap, filter, catchError, takeUntil } from 'rxjs/operators';
 import { MarketDataService, InstrumentSearchResult } from '../../../services/market-data.service';
+import {MatSelect} from '@angular/material/select';
 
 export interface AddInvestmentDialogData {
   portfolioId: number;
@@ -37,7 +38,8 @@ export interface AddInvestmentDialogResult {
     MatInputModule,
     MatButtonModule,
     MatAutocompleteModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatSelect
   ],
   templateUrl: './add-investment-dialog.component.html',
 })
@@ -48,6 +50,8 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
   isLoadingSearch = false;
   selectedInstrument: InstrumentSearchResult | null = null;
   private readonly destroy$ = new Subject<void>();
+
+  availableCurrencies: string[] = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'];
 
   constructor(
     private readonly fb: FormBuilder,
@@ -96,7 +100,7 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
     ).subscribe();
   }
 
-  ngOnInit(): void { /* TODO document why this method 'ngOnInit' is empty */  }
+  ngOnInit(): void {}
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -115,14 +119,25 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
     this.selectedInstrument = event.option.value as InstrumentSearchResult;
 
     if (this.selectedInstrument) {
+      const isCrypto = this.selectedInstrument.type?.toLowerCase() === 'crypto';
+
       this.investmentForm.patchValue({
         ticker: this.selectedInstrument.symbol,
-        type: this.selectedInstrument.type,
-        currency: this.selectedInstrument.currency
+        type: this.selectedInstrument.type || 'N/A',
+        currency: isCrypto ? '' : this.selectedInstrument.currency
       });
-      this.investmentForm.get('ticker')?.enable();
-      this.investmentForm.get('type')?.enable();
-      this.investmentForm.get('currency')?.enable();
+
+      if (isCrypto) {
+        this.investmentForm.get('currency')?.enable();
+        this.investmentForm.get('currency')?.setValidators([Validators.required, Validators.minLength(3), Validators.maxLength(3)]);
+      } else {
+        this.investmentForm.get('currency')?.disable();
+        this.investmentForm.get('currency')?.clearValidators();
+        if (!this.selectedInstrument.currency) {
+          this.investmentForm.patchValue({ currency: 'USD' });
+        }
+      }
+      this.investmentForm.get('currency')?.updateValueAndValidity();
 
       const displayValue = this.displayFn(this.selectedInstrument);
       setTimeout(() => {

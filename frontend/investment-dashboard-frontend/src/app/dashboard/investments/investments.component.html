@@ -68,7 +68,7 @@
 
     <div *ngIf="hasPortfolios && selectedPortfolioId">
       <div class="section">
-        <h2 class="section-title">Active Investments in {{ selectedPortfolioName }}</h2>
+        <h2 class="section-title">Active Investments in selected Portfolio</h2>
 
         <!-- Investment Loading / No Data State -->
         <div *ngIf="isLoadingInvestments" class="loading-container">
@@ -222,6 +222,57 @@
 
         </mat-tab-group>
       </div>
+
+      <!-- SOLD Investments Section -->
+      <div class="section sold-investments-section" *ngIf="soldInvestmentsForSelectedPortfolio && soldInvestmentsForSelectedPortfolio.length > 0">
+        <mat-divider></mat-divider>
+        <h2 class="section-title sold-title">Sold Investments History</h2>
+        <div class="investment-cards">
+          <mat-card class="investment-card sold-card" *ngFor="let investment of soldInvestmentsForSelectedPortfolio">
+            <mat-card-header>
+              <div mat-card-avatar class="stock-avatar sold-avatar">{{ investment.ticker.substring(0, 4) }}</div>
+              <mat-card-title>{{ investment.ticker }}</mat-card-title>
+              <mat-card-subtitle>{{ investment.type }} - Sold</mat-card-subtitle>
+              <!-- Optional: Add button to mark as DELETED -->
+              <button mat-icon-button color="warn" class="card-action-button" (click)="deleteInvestment(investment)" matTooltip="Delete Record Permanently">
+                <mat-icon>delete_forever</mat-icon>
+              </button>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="investment-data">
+                <div class="data-row">
+                  <span class="label">Units Sold:</span>
+                  <span class="value">{{ investment.amount | number }}</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Purchase Price:</span>
+                  <span class="value">{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Date Sold:</span>
+                  <!-- Assuming lastUpdateDate reflects sell date -->
+                  <span class="value">{{ investment.lastUpdateDate | date:'shortDate' }}</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Purchase Date:</span>
+                  <span class="value">{{ investment.createdAt | date:'shortDate' }}</span>
+                </div>
+                <div class="data-row">
+                  <span class="label">Realized PnL:</span>
+                  <span class="value"
+                        *ngIf="investment.realizedPnl !== null"
+                        [class.positive]="(investment.realizedPnl ?? 0) > 0"
+                        [class.negative]="(investment.realizedPnl ?? 0) < 0">
+                           {{ investment.realizedPnl | currency:investment.currency:'symbol':'1.2-2' }}
+                        </span>
+                  <span class="value unavailable" *ngIf="investment.realizedPnl === null">N/A</span>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>

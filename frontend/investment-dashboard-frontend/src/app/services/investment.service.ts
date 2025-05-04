@@ -121,13 +121,16 @@ export class InvestmentService {
     );
   }
 
-  sellInvestment(investmentId: string): Observable<Investment | null> {
+  // Sell an investment (update status to SOLD)
+  sellInvestment(investmentId: string, sellData: { sellPrice: number }): Observable<Investment | null> {
     const url = `${this.baseUrl}/investments/${investmentId}/sell`;
-    console.log(`Attempting to sell investment at: ${url}`);
-    // PATCH request, expecting the updated investment back
-    return this.http.patch<Investment>(url, {}).pipe(
+    console.log(`Attempting to sell investment at: ${url} with data:`, sellData);
+    // PATCH request with sellData in the body
+    return this.http.patch<Investment>(url, sellData).pipe(
       catchError((error: HttpErrorResponse) => {
         console.error(`Error selling investment ${investmentId}:`, error);
+        const errorMessage = error.error?.message || error.error?.error || 'Failed to mark investment as SOLD.';
+        this.snackBar.open(`Error: ${errorMessage}`, 'Close', { duration: 5000 });
         return of(null);
       })
     );

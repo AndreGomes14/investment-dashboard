@@ -25,8 +25,9 @@ import {EditPortfolioDialogComponent} from '../portfolio/dialog/edit-portfolio-d
 import {ConfirmDeleteDialogComponent} from '../portfolio/dialog/confirm-delete-dialog.component';
 import {AddInvestmentDialogComponent} from './dialog/add-investment-dialog.component';
 import {EditInvestmentDialogComponent, EditInvestmentDialogResult} from './dialog/edit-investment-dialog.component';
-import {SellConfirmDialogComponent} from './dialog/sell-confirm-dialog.component';
+import { SellConfirmDialogComponent, SellConfirmDialogResult } from './dialog/sell-confirm-dialog.component';
 
+// Define the interface for aggregated data
 interface AggregatedInvestment {
   ticker: string;
   type: string;
@@ -69,6 +70,7 @@ export class InvestmentsComponent implements OnInit {
   portfolios: Portfolio[] | null = null;
   selectedPortfolioId: number | null = null;
   investmentsForSelectedPortfolio: Investment[] | null = null;
+  soldInvestmentsForSelectedPortfolio: Investment[] | null = null;
   aggregatedInvestments: AggregatedInvestment[] | null = null;
 
   get selectedPortfolioName(): string {
@@ -97,6 +99,7 @@ export class InvestmentsComponent implements OnInit {
     }
     this.selectedPortfolioId = null;
     this.investmentsForSelectedPortfolio = null;
+    this.soldInvestmentsForSelectedPortfolio = null;
     this.aggregatedInvestments = null;
     this.portfolioService.getUserPortfolios()
       .pipe(
@@ -135,42 +138,62 @@ export class InvestmentsComponent implements OnInit {
 
     this.isLoadingInvestments = true;
     this.investmentsForSelectedPortfolio = null;
+    this.soldInvestmentsForSelectedPortfolio = null;
     this.aggregatedInvestments = null;
 
     this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
       .pipe(finalize(() => this.isLoadingInvestments = false))
-      .subscribe(investments => {
-        let activeInvestments = investments ? investments.filter(inv => inv.status === 'ACTIVE') : [];
-
-        // Add percentProfit dynamically to each *active* investment object
-        if (activeInvestments) {
-          activeInvestments.forEach((inv: any) => {
-            const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
-            const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
-
-            if (totalCurrentValue !== null && totalPurchaseCost > 0) {
-              inv.percentProfit = (totalCurrentValue - totalPurchaseCost) / totalPurchaseCost;
-            } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue > 0) {
-              inv.percentProfit = Infinity;
-            } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue === 0) {
-              inv.percentProfit = 0;
-            } else {
-              inv.percentProfit = null;
-            }
-          });
+      .subscribe(allInvestments => {
+        if (!allInvestments) {
+          console.log(`Failed to load investments for portfolio ${this.selectedPortfolioId}`);
+          this.investmentsForSelectedPortfolio = [];
+          this.soldInvestmentsForSelectedPortfolio = [];
+          this.aggregatedInvestments = [];
+          return;
         }
+
+        // Filter into ACTIVE and SOLD lists
+        const activeInvestments = allInvestments.filter(inv => inv.status === 'ACTIVE');
+        const soldInvestments = allInvestments.filter(inv => inv.status === 'SOLD');
+
+        // Calculate profit for active investments
+        activeInvestments.forEach((inv: any) => {
+          const totalPurchaseCost = (inv.amount ?? 0) * (inv.purchasePrice ?? 0);
+          const totalCurrentValue = inv.currentValue !== null ? (inv.amount ?? 0) * inv.currentValue : null;
+
+          if (totalCurrentValue !== null && totalPurchaseCost > 0) {
+            inv.percentProfit = (totalCurrentValue - totalPurchaseCost) / totalPurchaseCost;
+          } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue > 0) {
+            inv.percentProfit = Infinity;
+          } else if (totalCurrentValue !== null && totalPurchaseCost === 0 && totalCurrentValue === 0) {
+            inv.percentProfit = 0;
+          } else {
+            inv.percentProfit = null;
+          }
+        });
+        // Calculate realized profit for SOLD investments
+        soldInvestments.forEach((inv: any) => {
+          if (inv.sellPrice !== null && inv.sellPrice !== undefined &&
+            inv.purchasePrice !== null && inv.purchasePrice !== undefined &&
+            inv.amount !== null && inv.amount !== undefined) {
+            inv.realizedPnl = (inv.sellPrice - inv.purchasePrice) * inv.amount;
+          } else {
+            inv.realizedPnl = null; // Cannot calculate if data is missing
+          }
+        });
 
         this.investmentsForSelectedPortfolio = activeInvestments;
+        this.soldInvestmentsForSelectedPortfolio = soldInvestments;
+
         if (activeInvestments && activeInvestments.length > 0) {
-          console.log(`Loaded ${activeInvestments.length} individual investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
+          console.log(`Loaded ${activeInvestments.length} ACTIVE investments for portfolio ${this.selectedPortfolioId}. Aggregating...`);
           this.aggregateInvestments(activeInvestments);
           console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
-        } else if (activeInvestments) {
-          console.log(`No investments exist for portfolio ${this.selectedPortfolioId}`);
-          this.aggregatedInvestments = [];
         } else {
-          console.log(`Failed to load investments for portfolio ${this.selectedPortfolioId}`);
+          console.log(`No ACTIVE investments exist for portfolio ${this.selectedPortfolioId}`);
+          this.aggregatedInvestments = [];
         }
+        console.log(`Found ${soldInvestments.length} SOLD investments for portfolio ${this.selectedPortfolioId}.`);
       });
   }
 
@@ -467,26 +490,28 @@ export class InvestmentsComponent implements OnInit {
       data: { investment: investment }
     });
 
-    dialogRef.afterClosed().subscribe(confirmed => {
-      if (confirmed) {
-        console.log(`Sell confirmed for investment ID: ${investment.id}`);
-        this.investmentService.sellInvestment(String(investment.id))
+    dialogRef.afterClosed().subscribe((result: SellConfirmDialogResult | undefined) => {
+      if (result && result.sellPrice !== undefined) {
+        console.log(`Sell confirmed for investment ID: ${investment.id} at price ${result.sellPrice}`);
+
+        const sellData = { sellPrice: result.sellPrice };
+
+        this.investmentService.sellInvestment(String(investment.id), sellData)
           .subscribe({
             next: (soldInvestment) => {
               if (soldInvestment) {
                 this.snackBar.open(`Investment '${soldInvestment.ticker}' marked as SOLD.`, 'Close', { duration: 3000 });
-                // Reload investments to reflect the status change (it will be filtered out)
                 this.loadInvestmentsForSelectedPortfolio();
               } else {
                 console.error(`Sell operation failed for investment ${investment.id} (service returned null/unexpected).`);
-                this.snackBar.open(`Failed to mark investment as SOLD.`, 'Close', { duration: 3000 });
               }
             },
             error: (err) => {
-              console.error(`Error selling investment ${investment.id}:`, err);
-              this.snackBar.open(`Error marking investment as SOLD. ${err.message || ''}`, 'Close', { duration: 5000 });
+              console.error(`Error marking investment as SOLD. ${err.message || ''}`);
             }
           });
+      } else {
+        console.log(`Sell dialog closed without confirmation or valid price for investment ID: ${investment.id}`);
       }
     });
   }

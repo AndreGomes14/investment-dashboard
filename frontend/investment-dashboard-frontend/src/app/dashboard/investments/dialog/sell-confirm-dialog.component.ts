@@ -1,12 +1,19 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { Investment } from '../../../model/investment.model'; // Corrected path
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Investment } from '../../../model/investment.model';
 
 export interface SellConfirmDialogData {
   investment: Investment;
+}
+
+export interface SellConfirmDialogResult {
+  sellPrice: number;
 }
 
 @Component({
@@ -14,36 +21,39 @@ export interface SellConfirmDialogData {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule
   ],
-  template: `
-    <h2 mat-dialog-title>Confirm Sell</h2>
-    <mat-dialog-content>
-      Are you sure you want to mark the investment in
-      <strong>{{ data.investment.ticker }}</strong> ({{ data.investment.amount }} units)
-      as SOLD? This action cannot be easily undone.
-      <p><small>Note: This will change the status but not delete the record.</small></p>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="onNoClick()">Cancel</button>
-      <button mat-raised-button color="warn" [mat-dialog-close]="true" cdkFocusInitial>
-        <mat-icon>sell</mat-icon> Confirm Sell
-      </button>
-    </mat-dialog-actions>
-  `,
-  styles: [`
-    p small { color: grey; }
-  `]
+  templateUrl: './sell-confirm-dialog.component.html',
+  styleUrls: ['./sell-confirm-dialog.component.css']
 })
-export class SellConfirmDialogComponent {
+export class SellConfirmDialogComponent implements OnInit {
+  sellForm: FormGroup;
+
   constructor(
-    public dialogRef: MatDialogRef<SellConfirmDialogComponent>,
+    private readonly fb: FormBuilder,
+    public dialogRef: MatDialogRef<SellConfirmDialogComponent, SellConfirmDialogResult>,
     @Inject(MAT_DIALOG_DATA) public data: SellConfirmDialogData
-  ) {}
+  ) {
+    this.sellForm = this.fb.group({
+      sellPrice: [this.data.investment.currentValue ?? null, [Validators.required, Validators.min(0)]]
+    });
+  }
+
+  ngOnInit(): void { }
 
   onNoClick(): void {
     this.dialogRef.close();
+  }
+
+  onConfirmSell(): void {
+    if (this.sellForm.valid) {
+      this.dialogRef.close({ sellPrice: this.sellForm.value.sellPrice });
+    }
   }
 }

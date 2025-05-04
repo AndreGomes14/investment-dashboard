@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.market_data.PriceInfo;
 import com.myapp.investment_dashboard_backend.exception.ResourceNotFoundException;
 import com.myapp.investment_dashboard_backend.model.Investment;
@@ -69,14 +70,14 @@ public class InvestmentService {
 
         // --- Mapping and Creation ---
         Investment investment = new Investment();
-        investment.setPortfolio(portfolio); // Set from the found portfolio
+        investment.setPortfolio(portfolio);
         investment.setTicker(request.getTicker());
-        investment.setCurrentValue(getInvestmentCurrentValue(investment.getId()));
         investment.setType(request.getType());
         investment.setAmount(request.getAmount());
         investment.setPurchasePrice(request.getPurchasePrice());
         investment.setCurrency(request.getCurrency().toUpperCase());
         investment.setStatus(StatusInvestment.ACTIVE);
+        investment.setSellPrice(request.getPurchasePrice());
         investment.setLastUpdateDate(LocalDateTime.now());
 
         logger.info("Attempting initial save for investment: Ticker={}, Type={}, PortfolioID={}",
@@ -282,30 +283,31 @@ public class InvestmentService {
     }
 
     /**
-     * Marks an investment as SOLD.
+     * Marks an investment as SOLD and records the sell price.
      *
      * @param id The ID of the investment to mark as sold.
-     * @return The updated investment object with SOLD status, or null if not found.
+     * @param request DTO containing the sell price.
+     * @return The updated investment object with SOLD status and sell price.
+     * @throws ResourceNotFoundException if the investment is not found.
      */
     @Transactional
-    public Investment sellInvestment(UUID id) {
-        Optional<Investment> investmentOpt = investmentRepository.findById(id);
-        if (investmentOpt.isPresent()) {
-            Investment investment = investmentOpt.get();
-            // Trim status from DB before comparing
-            if (investment.getStatus() != null && StatusInvestment.ACTIVE.equals(investment.getStatus().trim())) {
-                investment.setStatus(StatusInvestment.SOLD);
-                investment.setLastUpdateDate(LocalDateTime.now());
-                Investment soldInvestment = investmentRepository.save(investment);
-                logger.info("Marked investment {} as SOLD.", id);
-                return soldInvestment;
-            } else {
-                logger.warn("Attempted to sell investment {} which is not ACTIVE (Status: '{}'). Trimmed comparison failed.", id, investment.getStatus()); // Updated log message
-                return investment; // Return unchanged investment
-            }
+    public Investment sellInvestment(UUID id, SellInvestmentRequest request) {
+        Investment investment = investmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Investment not found with id: " + id));
+
+        if (investment.getStatus() != null && StatusInvestment.ACTIVE.equals(investment.getStatus().trim())) {
+            investment.setStatus(StatusInvestment.SOLD);
+            investment.setSellPrice(request.sellPrice()); // Record sell price
+            investment.setLastUpdateDate(LocalDateTime.now()); // Acts as sell date
+            Investment soldInvestment = investmentRepository.save(investment);
+            logger.info("Marked investment {} as SOLD at price {}.", id, request.sellPrice());
+            return soldInvestment;
         } else {
-            logger.warn("Investment {} not found for selling.", id);
-            throw new ResourceNotFoundException("Investment not found with id: " + id);
+            logger.warn("Attempted to sell investment {} which is not ACTIVE (Status: '{}'). Trimmed comparison failed.", id, investment.getStatus());
+            // Optionally throw an exception or return the unmodified investment
+            throw new IllegalStateException("Cannot sell an investment that is not ACTIVE.");
+            // return investment; // Or return unchanged investment
         }
+        // Removed the else block for 'not found' as findById().orElseThrow() handles it.
     }
 }

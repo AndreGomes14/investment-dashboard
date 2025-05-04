@@ -319,14 +319,15 @@ public class MarketDataService {
             if (coinsNode.isArray()) {
                 List<InstrumentSearchResult> results = new ArrayList<>();
                 for (JsonNode coin : coinsNode) {
-                    // Use symbol (e.g., BTC) as ticker, name as name.
-                    // CoinGecko search doesn't provide region or currency directly.
+                    // Use CoinGecko ID as the 'ticker' for our system
+                    // Use symbol for display perhaps, but ID is needed for price lookups
+                    String coinGeckoId = coin.path("id").asText(null);
                     String symbol = coin.path("symbol").asText(null);
-                    if (symbol == null || symbol.trim().isEmpty()) {
+                    if (coinGeckoId == null || coinGeckoId.trim().isEmpty()) {
                         continue; // Skip if essential info missing
                     }
                     results.add(new InstrumentSearchResult(
-                            symbol,
+                            coinGeckoId, // Use CoinGecko ID as the ticker
                             coin.path("name").asText(null),
                             "Crypto", // Set type explicitly
                             null, // Region not available from this endpoint

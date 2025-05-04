@@ -1,10 +1,12 @@
 package com.myapp.investment_dashboard_backend.controller;
 
 import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -58,7 +60,8 @@ public class InvestmentController {
         try {
             Investment updatedInvestment = investmentService.updateInvestment(id, request);
             return ResponseEntity.ok(updatedInvestment);
-        } catch (Exception e) {
+        } catch (Exception e) { // Catch potential ResourceNotFoundException from service
+            // Consider more specific exception handling
             return ResponseEntity.notFound().build();
         }
     }
@@ -73,9 +76,9 @@ public class InvestmentController {
     public ResponseEntity<Void> deleteInvestment(@PathVariable UUID id) {
         boolean deleted = investmentService.deleteInvestment(id);
         if (deleted) {
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok().build(); // Return 200 OK if status updated
         } else {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.notFound().build(); // Return 404 if not found
         }
     }
 
@@ -83,13 +86,16 @@ public class InvestmentController {
      * Marks an investment as sold.
      *
      * @param id The ID of the investment to mark as sold.
+     * @param request DTO containing the sell price.
      * @return ResponseEntity containing the updated investment.
      */
     @PatchMapping("/{id}/sell")
-    public ResponseEntity<Investment> sellInvestment(@PathVariable UUID id) {
+    public ResponseEntity<Investment> sellInvestment(@PathVariable UUID id, @Valid @RequestBody SellInvestmentRequest request) {
         try {
-            Investment soldInvestment = investmentService.sellInvestment(id);
+            Investment soldInvestment = investmentService.sellInvestment(id, request);
             return ResponseEntity.ok(soldInvestment);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }

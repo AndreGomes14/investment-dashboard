@@ -58,4 +58,7 @@ public class Investment {
 
     @Column(name = "currency" , length = 3)
     private String currency;
+
+    @Column(name = "sell_price", precision = 19, scale = 4)
+    private BigDecimal sellPrice;
 }

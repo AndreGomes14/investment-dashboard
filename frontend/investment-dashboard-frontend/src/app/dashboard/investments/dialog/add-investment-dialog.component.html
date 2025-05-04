@@ -48,10 +48,23 @@
         <mat-error *ngIf="investmentForm.get('type')?.hasError('required')">Type is required (select from search).</mat-error>
       </mat-form-field>
 
+      <!-- Currency Field: Conditional Input/Select -->
       <mat-form-field appearance="fill">
         <mat-label>Currency</mat-label>
-        <input matInput formControlName="currency" readonly> <!-- Readonly, populated by search -->
-        <mat-error *ngIf="investmentForm.get('currency')?.hasError('required')">Currency is required (select from search).</mat-error>
+        <!-- Readonly Input for Non-Crypto -->
+        <input *ngIf="investmentForm.get('currency')?.disabled"
+               matInput
+               formControlName="currency"
+               readonly>
+        <!-- Select Dropdown for Crypto -->
+        <mat-select *ngIf="!investmentForm.get('currency')?.disabled"
+                    formControlName="currency">
+          <mat-option *ngFor="let curr of availableCurrencies" [value]="curr">
+            {{ curr }}
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="investmentForm.get('currency')?.hasError('required')">Currency is required.</mat-error>
+        <!-- Removed length validation as it's a select now -->
       </mat-form-field>
     </div>
 
