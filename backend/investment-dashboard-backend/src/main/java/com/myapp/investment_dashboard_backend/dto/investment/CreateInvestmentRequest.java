@@ -3,21 +3,19 @@ package com.myapp.investment_dashboard_backend.dto.investment;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateInvestmentRequest {
-    @NotNull(message = "Portfolio ID is required")
-    private UUID portfolioId;
 
     @NotBlank(message = "Ticker is required")
     private String ticker;
@@ -32,5 +30,9 @@ public class CreateInvestmentRequest {
     @NotNull(message = "Purchase price is required")
     @DecimalMin(value = "0.0001", message = "Purchase price must be greater than zero")
     private BigDecimal purchasePrice;
+
+    @NotNull(message = "Currency is required")
+    @Size(min = 3, max = 3, message = "Currency code must be 3 characters")
+    private String currency;
 }
 

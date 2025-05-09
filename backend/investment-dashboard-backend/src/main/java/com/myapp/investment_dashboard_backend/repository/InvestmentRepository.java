@@ -38,4 +38,9 @@ public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
     Optional<Investment> findById(UUID id);
 
     void deleteById(UUID id);
+
+    List<Investment> findByPortfolioId(UUID portfolioId);
+
+    List<Investment> findByPortfolio_IdIn(List<UUID> portfolioIds);
+
 }

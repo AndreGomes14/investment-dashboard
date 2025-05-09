@@ -1,13 +1,14 @@
-
 package com.myapp.investment_dashboard_backend.controller;
 
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +32,7 @@ public class InvestmentController {
     @GetMapping
     public ResponseEntity<List<Investment>> getAllInvestments() {
         List<Investment> investments = investmentService.getAllInvestments();
-        return new ResponseEntity<>(investments, HttpStatus.OK);
+        return ResponseEntity.ok(investments);
     }
 
     /**
@@ -43,35 +44,25 @@ public class InvestmentController {
     @GetMapping("/{id}")
     public ResponseEntity<Investment> getInvestmentById(@PathVariable UUID id) {
         Optional<Investment> investment = investmentService.getInvestmentById(id);
-        return investment.map(value -> new ResponseEntity<>(value, HttpStatus.OK)).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
-    }
-
-    /**
-     * Creates a new investment.
-     *
-     * @param investment The investment object to create.
-     * @return ResponseEntity containing the created investment.
-     */
-    @PostMapping
-    public ResponseEntity<Investment> createInvestment(@RequestBody Investment investment) {
-        Investment createdInvestment = investmentService.createInvestment(investment);
-        return new ResponseEntity<>(createdInvestment, HttpStatus.CREATED);
+        return investment.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
      * Updates an existing investment.
      *
-     * @param id           The ID of the investment to update.
-     * @param investment The updated investment object.
-     * @return ResponseEntity containing the updated investment, or NOT_FOUND if the investment does not exist.
+     * @param id      The ID of the investment to update.
+     * @param request The DTO containing the fields to update.
+     * @return ResponseEntity containing the updated investment.
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Investment> updateInvestment(@PathVariable UUID id, @RequestBody Investment investment) {
-        Investment updatedInvestment = investmentService.updateInvestment(id, investment);
-        if (updatedInvestment != null) {
-            return new ResponseEntity<>(updatedInvestment, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    public ResponseEntity<Investment> updateInvestment(@PathVariable UUID id, @Valid @RequestBody UpdateInvestmentRequest request) {
+        try {
+            Investment updatedInvestment = investmentService.updateInvestment(id, request);
+            return ResponseEntity.ok(updatedInvestment);
+        } catch (Exception e) { // Catch potential ResourceNotFoundException from service
+            // Consider more specific exception handling
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -83,39 +74,30 @@ public class InvestmentController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteInvestment(@PathVariable UUID id) {
-        investmentService.deleteInvestment(id);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-    }
-
-    /**
-     * Retrieves the current value of an investment.
-     *
-     * @param id The ID of the investment.
-     * @return ResponseEntity containing the current value, or NOT_FOUND if the investment does not exist, or INTERNAL_SERVER_ERROR if the value cannot be retrieved.
-     */
-    @GetMapping("/{id}/current-value")
-    public ResponseEntity<BigDecimal> getInvestmentCurrentValue(@PathVariable UUID id) {
-        BigDecimal currentValue = investmentService.getInvestmentCurrentValue(id);
-        if (currentValue != null) {
-            return new ResponseEntity<>(currentValue, HttpStatus.OK);
+        boolean deleted = investmentService.deleteInvestment(id);
+        if (deleted) {
+            return ResponseEntity.ok().build(); // Return 200 OK if status updated
         } else {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or NOT_FOUND if investment doesn't exist
+            return ResponseEntity.notFound().build(); // Return 404 if not found
         }
     }
 
     /**
-     * Updates the current value of an investment.
+     * Marks an investment as sold.
      *
-     * @param id The ID of the investment to update.
-     * @return ResponseEntity containing the updated investment, or NOT_FOUND if the investment does not exist, or INTERNAL_SERVER_ERROR if the update fails.
+     * @param id The ID of the investment to mark as sold.
+     * @param request DTO containing the sell price.
+     * @return ResponseEntity containing the updated investment.
      */
-    @PutMapping("/{id}/current-value")
-    public ResponseEntity<Investment> updateInvestmentValue(@PathVariable UUID id) {
-        Investment updatedInvestment = investmentService.updateInvestmentValue(id);
-        if (updatedInvestment != null) {
-            return new ResponseEntity<>(updatedInvestment, HttpStatus.OK);
-        } else {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); //  Or NOT_FOUND
+    @PatchMapping("/{id}/sell")
+    public ResponseEntity<Investment> sellInvestment(@PathVariable UUID id, @Valid @RequestBody SellInvestmentRequest request) {
+        try {
+            Investment soldInvestment = investmentService.sellInvestment(id, request);
+            return ResponseEntity.ok(soldInvestment);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }

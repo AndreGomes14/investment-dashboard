@@ -1,5 +1,7 @@
 package com.myapp.investment_dashboard_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.myapp.investment_dashboard_backend.utils.StatusInvestment;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,6 +24,7 @@ public class Investment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "portfolio_id", nullable = false)
+    @JsonBackReference
     private Portfolio portfolio;
 
     @Column(nullable = false, length = 20)
@@ -43,7 +46,7 @@ public class Investment {
     private LocalDateTime lastUpdateDate;
 
     @Column(nullable = false, length = 20)
-    private String status = "ACTIVE"; // ACTIVE, SOLD, DELETED
+    private String status = StatusInvestment.ACTIVE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -52,4 +55,10 @@ public class Investment {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "currency" , length = 3)
+    private String currency;
+
+    @Column(name = "sell_price", precision = 19, scale = 4)
+    private BigDecimal sellPrice;
 }

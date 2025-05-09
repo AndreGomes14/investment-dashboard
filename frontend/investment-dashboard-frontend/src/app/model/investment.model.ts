@@ -9,8 +9,12 @@ export interface Investment {
   amount: number;
   purchasePrice: number;
   currentValue?: number;
+  sellPrice?: number;
   lastUpdateDate?: Date;
+  currency: string;
   status: 'ACTIVE' | 'SOLD' | 'DELETED';
   createdAt?: Date;
   updatedAt?: Date;
+  percentProfit?: number | null;
+  realizedPnl?: number | null;
 }

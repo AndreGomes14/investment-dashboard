@@ -28,9 +28,6 @@ public class UserSetting {
     @Column(name = "setting_value")
     private String value;
 
-    public UserSetting(User user, String key, String value) {
-        this.user = user;
-        this.key = key;
-        this.value = value;
-    }
+    @Column(name = "preferred_currency" , length = 3)
+    private String preferredCurrency;
 }

@@ -1,6 +1,5 @@
 package com.myapp.investment_dashboard_backend.dto.portfolio;
 
-import com.myapp.investment_dashboard_backend.dto.investment.InvestmentPerformanceDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +18,6 @@ public class PortfolioSummaryDTO {
     private BigDecimal totalValue;
     private BigDecimal totalPerformance;
     private int activeInvestmentsCount;
-    private InvestmentPerformanceDTO bestPerformer;
-    private InvestmentPerformanceDTO worstPerformer;
+    private com.myapp.investment_dashboard_backend.dto.portfolio.InvestmentPerformanceDTO bestPerformer;
+    private com.myapp.investment_dashboard_backend.dto.portfolio.InvestmentPerformanceDTO worstPerformer;
 }
