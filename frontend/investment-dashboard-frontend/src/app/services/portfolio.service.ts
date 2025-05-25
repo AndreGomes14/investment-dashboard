@@ -35,6 +35,12 @@ export interface PortfolioSummaryResponse {
   soldInvestments: Investment[];
 }
 
+// For the new history chart
+export interface HistoricalDataPoint {
+  timestamp: string; // or Date, will be parsed
+  value: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -140,6 +146,53 @@ export class PortfolioService {
         const message = error.error?.message || 'Failed to delete portfolio.';
         this.snackBar.open(message, 'Close', { duration: 5000 });
         return of(false); // Return false on error
+      })
+    );
+  }
+
+  /**
+   * Updates the values of all investments in a portfolio and recalculates the portfolio value.
+   *
+   * @param portfolioId The ID of the portfolio to update.
+   * @returns Observable of the updated Portfolio or null on error.
+   */
+  updatePortfolioValues(portfolioId: number): Observable<Portfolio | null> {
+    return this.http.post<Portfolio>(`${this.portfolioApiUrl}/${portfolioId}/update-values`, {}).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error updating values for portfolio ${portfolioId}:`, error);
+        const message = error.error?.message || 'Failed to update portfolio values.';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Updates the current values of all active investments for the current user across all their portfolios.
+   * @returns Observable<void> indicating completion or null on error.
+   */
+  refreshAllUserPortfolioValues(): Observable<void | null> {
+    return this.http.post<void>(`${this.portfolioApiUrl}/user/update-all-values`, {}).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error('Error updating all user portfolio values:', error);
+        const message = error.error?.message || 'Failed to update all user investment values.';
+        this.snackBar.open(message, 'Close', { duration: 5000 });
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Fetches the overall historical value for the current user's portfolios.
+   * @param range Time range string (e.g., "7d", "1m", "all")
+   * @returns Observable of an array of historical data points or null on error.
+   */
+  getOverallUserValueHistory(range: string): Observable<HistoricalDataPoint[] | null> {
+    return this.http.get<HistoricalDataPoint[]>(`${this.portfolioApiUrl}/history/overall`, { params: { range } }).pipe(
+      catchError((error: HttpErrorResponse) => {
+        console.error(`Error fetching overall user value history for range ${range}:`, error);
+        this.snackBar.open('Failed to load portfolio history.', 'Close', { duration: 3000 });
+        return of(null);
       })
     );
   }

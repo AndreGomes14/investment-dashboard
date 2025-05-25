@@ -24,6 +24,8 @@ export interface AddInvestmentDialogResult {
   amount: number;
   purchasePrice: number;
   portfolioId: number;
+  customName?: string;
+  currentValue?: number;
 }
 
 @Component({
@@ -51,6 +53,7 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
   selectedInstrument: InstrumentSearchResult | null = null;
   private readonly destroy$ = new Subject<void>();
 
+  availableInvestmentTypes: string[] = ['Equity', 'Crypto', 'ETF', 'Bond', 'Other'];
   availableCurrencies: string[] = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY'];
 
   constructor(
@@ -60,11 +63,19 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
     @Inject(MAT_DIALOG_DATA) public data: AddInvestmentDialogData
   ) {
     this.investmentForm = this.fb.group({
+      type: ['', Validators.required],
       ticker: [{value: '', disabled: true}, Validators.required],
-      type: [{value: '', disabled: true}, Validators.required],
+      customName: [''],
       currency: [{value: '', disabled: true}, Validators.required],
       amount: ['', [Validators.required, Validators.min(0.000001)]],
-      purchasePrice: ['', [Validators.required, Validators.min(0)]]
+      purchasePrice: ['', [Validators.required, Validators.min(0)]],
+      currentValue: ['']
+    });
+
+    this.investmentForm.get('type')?.valueChanges.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(typeValue => {
+      this.onInvestmentTypeChange(typeValue);
     });
 
     this.searchControl.valueChanges.pipe(
@@ -105,6 +116,47 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private onInvestmentTypeChange(typeValue: string): void {
+    if (typeValue === 'Other') {
+      this.investmentForm.get('customName')?.setValidators([Validators.required]);
+      this.investmentForm.get('customName')?.enable();
+      this.investmentForm.get('currentValue')?.setValidators([Validators.required, Validators.min(0)]);
+      this.investmentForm.get('currentValue')?.enable();
+      
+      this.investmentForm.get('ticker')?.clearValidators();
+      this.investmentForm.get('ticker')?.disable();
+      this.investmentForm.get('ticker')?.setValue('');
+      
+      this.investmentForm.get('currency')?.enable();
+      this.investmentForm.get('currency')?.setValidators([Validators.required, Validators.minLength(3), Validators.maxLength(3)]);
+
+      this.searchControl.disable();
+      this.searchControl.setValue('');
+      this.searchResultsList = [];
+      this.selectedInstrument = null;
+
+    } else {
+      this.investmentForm.get('customName')?.clearValidators();
+      this.investmentForm.get('customName')?.disable();
+      this.investmentForm.get('customName')?.setValue('');
+      this.investmentForm.get('currentValue')?.clearValidators();
+      this.investmentForm.get('currentValue')?.disable();
+      this.investmentForm.get('currentValue')?.setValue('');
+
+      this.investmentForm.get('ticker')?.setValidators([Validators.required]);
+      this.investmentForm.get('ticker')?.disable();
+
+      this.investmentForm.get('currency')?.disable();
+      this.investmentForm.get('currency')?.clearValidators();
+
+      this.searchControl.enable();
+    }
+    this.investmentForm.get('customName')?.updateValueAndValidity();
+    this.investmentForm.get('currentValue')?.updateValueAndValidity();
+    this.investmentForm.get('ticker')?.updateValueAndValidity();
+    this.investmentForm.get('currency')?.updateValueAndValidity();
   }
 
   private resetSelection(): void {
@@ -155,14 +207,39 @@ export class AddInvestmentDialogComponent implements OnInit, OnDestroy {
   }
 
   onSave(): void {
-    if (this.investmentForm.valid && this.selectedInstrument) {
-      const result: AddInvestmentDialogResult = {
-        ...this.investmentForm.getRawValue(),
-        portfolioId: this.data.portfolioId
-      };
+    if (this.investmentForm.valid) {
+      const formValue = this.investmentForm.getRawValue();
+      let result: AddInvestmentDialogResult;
+
+      if (formValue.type === 'Other') {
+        result = {
+          ticker: formValue.ticker || '',
+          type: formValue.type,
+          currency: formValue.currency,
+          amount: formValue.amount,
+          purchasePrice: formValue.purchasePrice,
+          portfolioId: this.data.portfolioId,
+          customName: formValue.customName,
+          currentValue: formValue.currentValue
+        };
+      } else {
+        if (!this.selectedInstrument) {
+          console.error("Instrument not selected for non-Other type");
+          return;
+        }
+        result = {
+          ticker: formValue.ticker,
+          type: formValue.type,
+          currency: formValue.currency,
+          amount: formValue.amount,
+          purchasePrice: formValue.purchasePrice,
+          portfolioId: this.data.portfolioId
+        };
+      }
       this.dialogRef.close(result);
     } else {
-      console.error("Form invalid or instrument not selected", this.investmentForm.errors);
+      console.error("Form invalid", this.investmentForm.errors, this.investmentForm.value);
+      this.investmentForm.markAllAsTouched();
     }
   }
 }

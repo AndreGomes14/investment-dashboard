@@ -152,3 +152,65 @@
     width: 100%;
   }
 }
+
+/* Styles for historical chart fullscreen */
+.historical-chart-card {
+  position: relative; /* Needed for absolute positioning of the button */
+  transition: all 0.3s ease-in-out;
+}
+
+.fullscreen-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  color: black;
+}
+
+.fullscreen-chart-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  margin: 0 !important; /* Override any existing margins */
+  padding: 20px; /* Add some padding inside the fullscreen view */
+  box-sizing: border-box; /* Ensure padding doesn't increase size beyond viewport */
+  overflow-y: auto; /* Allow scrolling if content overflows on smaller screens */
+}
+
+.fullscreen-chart-card .mat-card-header {
+  padding-bottom: 10px; /* Adjust header padding in fullscreen */
+}
+
+.fullscreen-chart-content {
+  height: calc(100% - 70px); /* Adjust based on header height and padding */
+  display: flex;
+  flex-direction: column;
+}
+
+.fullscreen-chart-card .chart-container {
+  flex-grow: 1;
+  width: 100%;
+  height: 100% !important; /* Override inline style for height */
+}
+
+/* Ensure the chart itself takes up the available space in the container */
+.fullscreen-chart-card ngx-charts-line-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Make sure other elements are hidden or pushed down when fullscreen is active */
+body.chart-fullscreen-active {
+  overflow: hidden; /* Prevent scrolling of the body */
+}
+
+/* Hide other elements in the app when chart is fullscreen. 
+   This might need to be more specific depending on your app structure. 
+   A simpler approach is to rely on the fixed positioning and z-index of the chart card itself. */
+app-root > *:not(.fullscreen-chart-card) {
+  /* display: none; */ /* This might be too aggressive, use with caution */
+}

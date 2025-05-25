@@ -45,3 +45,8 @@ router-outlet {
     color: white;
   }
 }
+
+/* Styles for chart fullscreen - hide sidebar */
+body.chart-fullscreen-active mat-sidenav.sidenav {
+  display: none !important;
+}

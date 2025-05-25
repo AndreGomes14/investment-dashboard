@@ -1,81 +1,84 @@
 <!-- add-investment-dialog.component.html -->
 <h1 mat-dialog-title>Add New Investment</h1>
 <div mat-dialog-content>
-  <!-- Use portfolioId from injected data -->
-  <p>Search for a financial instrument to add to portfolio {{ data.portfolioName }}).</p>
-
-  <!-- Search Input with Autocomplete -->
-  <mat-form-field appearance="fill" class="search-field">
-    <mat-label>Search Instrument (e.g., Apple, BTC, SXR8.DE)</mat-label>
-    <input type="text"
-           placeholder="Start typing..."
-           matInput
-           [formControl]="searchControl"
-           [matAutocomplete]="auto">
-    <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onOptionSelected($event)">
-      <mat-option *ngIf="isLoadingSearch" class="is-loading">
-        <mat-spinner diameter="20"></mat-spinner> Loading...
-      </mat-option>
-      <ng-container *ngIf="!isLoadingSearch">
-        <mat-option *ngFor="let option of searchResultsList" [value]="option">
-          <div>
-            <strong>{{ option.name }}</strong> ({{ option.symbol }})
-          </div>
-          <small>{{ option.type }} - {{ option.region }} [{{ option.currency }}]</small>
-        </mat-option>
-        <!-- Show message if search returns no results -->
-        <mat-option disabled *ngIf="searchResultsList.length === 0 && (searchControl.value?.length ?? 0) > 1">
-          No results found for "{{searchControl.value}}"
-        </mat-option>
-      </ng-container>
-
-    </mat-autocomplete>
-    <mat-hint>Select an instrument from the list to populate details.</mat-hint>
-  </mat-form-field>
+  <p>Portfolio: {{ data.portfolioName }}</p>
 
   <!-- Investment Details Form -->
   <form [formGroup]="investmentForm">
+
+    <!-- Investment Type Selection -->
     <mat-form-field appearance="fill">
-      <mat-label>Ticker Symbol</mat-label>
-      <input matInput formControlName="ticker" readonly> <!-- Readonly, populated by search -->
+      <mat-label>Investment Type</mat-label>
+      <mat-select formControlName="type">
+        <mat-option *ngFor="let invType of availableInvestmentTypes" [value]="invType">
+          {{ invType }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="investmentForm.get('type')?.hasError('required')">Investment type is required.</mat-error>
+    </mat-form-field>
+
+    <!-- Instrument Search (Visible if type is NOT 'Other') -->
+    <ng-container *ngIf="investmentForm.get('type')?.value !== 'Other'">
+      <mat-form-field appearance="fill" class="search-field">
+        <mat-label>Search Instrument (e.g., Apple, BTC, SXR8.DE)</mat-label>
+        <input type="text"
+               placeholder="Start typing..."
+               matInput
+               [formControl]="searchControl"
+               [matAutocomplete]="auto">
+        <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onOptionSelected($event)">
+          <mat-option *ngIf="isLoadingSearch" class="is-loading">
+            <mat-spinner diameter="20"></mat-spinner> Loading...
+          </mat-option>
+          <ng-container *ngIf="!isLoadingSearch">
+            <mat-option *ngFor="let option of searchResultsList" [value]="option">
+              <div>
+                <strong>{{ option.name }}</strong> ({{ option.symbol }})
+              </div>
+              <small>{{ option.type }} - {{ option.region }} [{{ option.currency }}]</small>
+            </mat-option>
+            <mat-option disabled *ngIf="searchResultsList.length === 0 && (searchControl.value?.length ?? 0) > 1">
+              No results found for "{{searchControl.value}}"
+            </mat-option>
+          </ng-container>
+        </mat-autocomplete>
+        <mat-hint>Select an instrument to auto-fill details.</mat-hint>
+      </mat-form-field>
+    </ng-container>
+
+    <!-- Custom Name (Visible and Required if type is 'Other') -->
+    <mat-form-field appearance="fill" *ngIf="investmentForm.get('type')?.value === 'Other'">
+      <mat-label>Custom Asset Name</mat-label>
+      <input matInput formControlName="customName" placeholder="e.g., Vintage Rolex Watch">
+      <mat-error *ngIf="investmentForm.get('customName')?.hasError('required')">Custom asset name is required.</mat-error>
+    </mat-form-field>
+
+    <!-- Ticker Symbol -->
+    <!-- For 'Other' type, this could be an optional identifier. For now, it's disabled by TS logic. -->
+    <!-- For standard types, it's disabled and populated by search. -->
+    <mat-form-field appearance="fill">
+      <mat-label>Ticker Symbol / Identifier</mat-label>
+      <input matInput formControlName="ticker" [readonly]="investmentForm.get('type')?.value !== 'Other' || investmentForm.get('ticker')?.disabled">
       <mat-error *ngIf="investmentForm.get('ticker')?.hasError('required')">Ticker is required (select from search).</mat-error>
     </mat-form-field>
 
     <div class="form-row">
-      <mat-form-field appearance="fill">
-        <mat-label>Type</mat-label>
-        <input matInput formControlName="type" readonly> <!-- Readonly, populated by search -->
-        <mat-error *ngIf="investmentForm.get('type')?.hasError('required')">Type is required (select from search).</mat-error>
-      </mat-form-field>
-
-      <!-- Currency Field: Conditional Input/Select -->
+      <!-- Currency Field -->
       <mat-form-field appearance="fill">
         <mat-label>Currency</mat-label>
-        <!-- Readonly Input for Non-Crypto -->
-        <input *ngIf="investmentForm.get('currency')?.disabled"
-               matInput
-               formControlName="currency"
-               readonly>
-        <!-- Select Dropdown for Crypto -->
-        <mat-select *ngIf="!investmentForm.get('currency')?.disabled"
-                    formControlName="currency">
+        <!-- Select Dropdown is always used now, enabled/disabled by TS logic -->
+        <mat-select formControlName="currency">
           <mat-option *ngFor="let curr of availableCurrencies" [value]="curr">
             {{ curr }}
           </mat-option>
         </mat-select>
         <mat-error *ngIf="investmentForm.get('currency')?.hasError('required')">Currency is required.</mat-error>
-        <!-- Removed length validation as it's a select now -->
-      </mat-form-field>
-    </div>
-
-    <div class="form-row">
-      <mat-form-field appearance="fill">
-        <mat-label>Amount / Quantity</mat-label>
-        <input matInput type="number" formControlName="amount" placeholder="e.g., 10.5">
-        <mat-error *ngIf="investmentForm.get('amount')?.hasError('required')">Amount is required.</mat-error>
-        <mat-error *ngIf="investmentForm.get('amount')?.hasError('min')">Amount must be positive.</mat-error>
+        <mat-error *ngIf="investmentForm.get('currency')?.hasError('minlength') || investmentForm.get('currency')?.hasError('maxlength')">
+          Currency code must be 3 letters.
+        </mat-error>
       </mat-form-field>
 
+      <!-- Purchase Price -->
       <mat-form-field appearance="fill">
         <mat-label>Purchase Price (per unit)</mat-label>
         <input matInput type="number" formControlName="purchasePrice" placeholder="e.g., 150.25">
@@ -84,11 +87,27 @@
       </mat-form-field>
     </div>
 
-  </form>
+    <div class="form-row">
+      <!-- Amount / Quantity -->
+      <mat-form-field appearance="fill">
+        <mat-label>Amount / Quantity</mat-label>
+        <input matInput type="number" formControlName="amount" placeholder="e.g., 10.5">
+        <mat-error *ngIf="investmentForm.get('amount')?.hasError('required')">Amount is required.</mat-error>
+        <mat-error *ngIf="investmentForm.get('amount')?.hasError('min')">Amount must be positive.</mat-error>
+      </mat-form-field>
 
+      <!-- Current Value (Visible and Required if type is 'Other') -->
+      <mat-form-field appearance="fill" *ngIf="investmentForm.get('type')?.value === 'Other'">
+        <mat-label>Current Value (per unit)</mat-label>
+        <input matInput type="number" formControlName="currentValue" placeholder="e.g., 175.00">
+        <mat-error *ngIf="investmentForm.get('currentValue')?.hasError('required')">Current value is required.</mat-error>
+        <mat-error *ngIf="investmentForm.get('currentValue')?.hasError('min')">Value cannot be negative.</mat-error>
+      </mat-form-field>
+    </div>
+
+  </form>
 </div>
-<div mat-dialog-actions="end">
+<div mat-dialog-actions align="end"> <!-- Changed from "end" to align="end" for newer Angular Material -->
   <button mat-button (click)="onCancel()">Cancel</button>
-  <!-- Disable save if form invalid OR if no instrument was selected via autocomplete -->
-  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!investmentForm.valid || !selectedInstrument">Add Investment</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!investmentForm.valid || (investmentForm.get('type')?.value !== 'Other' && !selectedInstrument)">Add Investment</button>
 </div>

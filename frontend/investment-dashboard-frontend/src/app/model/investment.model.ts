@@ -15,6 +15,9 @@ export interface Investment {
   status: 'ACTIVE' | 'SOLD' | 'DELETED';
   createdAt?: Date;
   updatedAt?: Date;
+  totalCost?: number;
   percentProfit?: number | null;
   realizedPnl?: number | null;
+  profitOrLoss?: number;
+  customName?: string;
 }

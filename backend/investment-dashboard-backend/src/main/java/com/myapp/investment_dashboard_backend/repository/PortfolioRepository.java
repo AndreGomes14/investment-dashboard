@@ -13,14 +13,6 @@ import java.util.UUID;
 
 @Repository
 public interface PortfolioRepository extends JpaRepository<Portfolio, UUID> {
-    List<Portfolio> findByUser(User user);
-
-    List<Portfolio> findByUserOrderByNameAsc(User user);
-
-    Optional<Portfolio> findByUserAndName(User user, String name);
-
-    boolean existsByUserAndName(User user, String name);
-
     @Query("SELECT p FROM Portfolio p LEFT JOIN FETCH p.investments WHERE p.id = :id")
     Optional<Portfolio> findByIdWithInvestments(UUID id);
 

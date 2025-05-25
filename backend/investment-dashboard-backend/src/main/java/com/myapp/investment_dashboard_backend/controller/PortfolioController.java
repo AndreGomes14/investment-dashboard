@@ -4,19 +4,18 @@ import com.myapp.investment_dashboard_backend.dto.portfolio.CreatePortfolioReque
 import com.myapp.investment_dashboard_backend.dto.portfolio.UpdatePortfolioRequest;
 import com.myapp.investment_dashboard_backend.model.Portfolio;
 import com.myapp.investment_dashboard_backend.model.User;
-import com.myapp.investment_dashboard_backend.service.PortfolioService;
-import com.myapp.investment_dashboard_backend.service.ExcelExportService;
+import com.myapp.investment_dashboard_backend.service.impl.ExcelExportServiceImpl;
+import com.myapp.investment_dashboard_backend.service.impl.InvestmentServiceImpl;
+import com.myapp.investment_dashboard_backend.service.impl.PortfolioServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -24,19 +23,22 @@ import java.util.UUID;
 
 import com.myapp.investment_dashboard_backend.dto.investment.CreateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
-import com.myapp.investment_dashboard_backend.service.InvestmentService;
 import com.myapp.investment_dashboard_backend.dto.portfolio.PortfolioSummaryResponse;
+import com.myapp.investment_dashboard_backend.dto.portfolio.HistoricalDataPointDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/portfolios")
 public class PortfolioController {
 
-    private final PortfolioService portfolioService;
-    private final InvestmentService investmentService;
-    private final ExcelExportService excelExportService;
+    private final PortfolioServiceImpl portfolioService;
+    private final InvestmentServiceImpl investmentService;
+    private final ExcelExportServiceImpl excelExportService;
+    private static final Logger logger = LoggerFactory.getLogger(PortfolioController.class);
 
     @Autowired
-    public PortfolioController(PortfolioService portfolioService, InvestmentService investmentService, ExcelExportService excelExportService) {
+    public PortfolioController(PortfolioServiceImpl portfolioService, InvestmentServiceImpl investmentService, ExcelExportServiceImpl excelExportService) {
         this.portfolioService = portfolioService;
         this.investmentService = investmentService;
         this.excelExportService = excelExportService;
@@ -190,7 +192,6 @@ public class PortfolioController {
     @GetMapping("/{portfolioId}/investments/export")
     public ResponseEntity<byte[]> exportInvestmentsToExcel(@PathVariable UUID portfolioId) {
         try {
-            // Optional: Add validation to check if portfolio exists and belongs to user
             List<Investment> investments = investmentService.getInvestmentsByPortfolioId(portfolioId);
             byte[] excelData = excelExportService.createInvestmentExcel(investments);
 
@@ -198,23 +199,17 @@ public class PortfolioController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             headers.setContentDispositionFormData(filename, filename);
-            // headers.setCacheControl("must-revalidate, post-check=0, pre-check=0"); // Optional cache control
 
             return new ResponseEntity<>(excelData, headers, HttpStatus.OK);
 
-        } catch (IOException e) {
-            // Log error - Handled by GlobalExceptionHandler or re-throw
-            // For simplicity, returning internal server error directly here
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            // Catch other potential exceptions (e.g., ResourceNotFound if portfolio doesn't exist)
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR); // Or more specific status
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
      * Retrieves summary data for all portfolios of the current user.
-     * Handles GET /api/portfolios/summary
+     *
      * @return ResponseEntity containing the overall PortfolioSummaryResponse.
      */
     @GetMapping("/summary")
@@ -225,7 +220,7 @@ public class PortfolioController {
 
     /**
      * Retrieves summary data for a specific portfolio.
-     * Handles GET /api/portfolios/{id}/summary
+     *
      * @param id The ID of the portfolio.
      * @return ResponseEntity containing the PortfolioSummaryResponse for the specific portfolio.
      */
@@ -234,6 +229,45 @@ public class PortfolioController {
         // Service method already handles not found and access denied exceptions
         PortfolioSummaryResponse summary = portfolioService.getPortfolioSummary(id);
         return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Updates the current values of all active investments for the current user across all their portfolios.
+     * It also recalculates the total value for each affected portfolio.
+     * Handles POST /api/portfolios/user/update-all-values
+     *
+     * @return ResponseEntity indicating success or failure.
+     */
+    @PostMapping("/user/update-all-values")
+    public ResponseEntity<Void> updateAllUserActiveInvestmentValues() {
+        try {
+            portfolioService.updateAllActiveInvestmentValuesForCurrentUser();
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Retrieves historical data for the current user's overall portfolio value.
+     * Handles GET /api/portfolios/history/overall?range={range}
+     *
+     * @param range The time range for the history (e.g., "7d", "1m", "3m", "1y", "all").
+     * @return ResponseEntity containing a list of historical data points or an error status.
+     */
+    @GetMapping("/history/overall")
+    public ResponseEntity<List<HistoricalDataPointDTO>> getOverallUserPortfolioHistory(
+            @RequestParam(defaultValue = "1m") String range) {
+        try {
+            List<HistoricalDataPointDTO> history = portfolioService.getOverallUserValueHistory(range);
+            if (history.isEmpty()) {
+                return ResponseEntity.noContent().build(); // Or OK with empty list based on preference
+            }
+            return ResponseEntity.ok(history);
+        } catch (Exception e) {
+            logger.error("Error retrieving overall user portfolio history for range '{}': {}", range, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
 

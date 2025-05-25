@@ -3,7 +3,7 @@ package com.myapp.investment_dashboard_backend.controller;
 import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
-import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import com.myapp.investment_dashboard_backend.service.impl.InvestmentServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,10 +17,10 @@ import java.util.UUID;
 @RequestMapping("/api/investments")
 public class InvestmentController {
 
-    private final InvestmentService investmentService;
+    private final InvestmentServiceImpl investmentService;
 
     @Autowired
-    public InvestmentController(InvestmentService investmentService) {
+    public InvestmentController(InvestmentServiceImpl investmentService) {
         this.investmentService = investmentService;
     }
 
