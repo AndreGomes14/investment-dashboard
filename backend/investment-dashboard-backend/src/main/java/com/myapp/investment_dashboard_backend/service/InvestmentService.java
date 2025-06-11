@@ -22,4 +22,7 @@ public interface InvestmentService {
     Investment sellInvestment(UUID id, SellInvestmentRequest request);
     // Assuming MarketDataService is an interface, it should be defined in this package too
     // or its definition confirmed if it's from a third party or another module.
+
+    // New method for manually updating current value
+    Investment manuallyUpdateInvestmentCurrentValue(UUID investmentId, BigDecimal newCurrentValue);
 } 

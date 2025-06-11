@@ -11,6 +11,7 @@ import com.myapp.investment_dashboard_backend.repository.InvestmentRepository;
 import com.myapp.investment_dashboard_backend.repository.PortfolioRepository;
 import com.myapp.investment_dashboard_backend.service.InvestmentService;
 import com.myapp.investment_dashboard_backend.service.MarketDataService;
+import com.myapp.investment_dashboard_backend.service.PortfolioService;
 import com.myapp.investment_dashboard_backend.utils.StatusInvestment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,12 +34,14 @@ public class InvestmentServiceImpl implements InvestmentService {
     private final MarketDataServiceImpl marketDataService;
     private static final Logger logger = LoggerFactory.getLogger(InvestmentServiceImpl.class);
     private final PortfolioRepository portfolioRepository;
+    private final PortfolioService portfolioService;
 
     @Autowired
-    public InvestmentServiceImpl(InvestmentRepository investmentRepository, MarketDataServiceImpl marketDataService, PortfolioRepository portfolioRepository) {
+    public InvestmentServiceImpl(InvestmentRepository investmentRepository, MarketDataServiceImpl marketDataService, PortfolioRepository portfolioRepository, PortfolioService portfolioService) {
         this.investmentRepository = investmentRepository;
         this.marketDataService = marketDataService;
         this.portfolioRepository = portfolioRepository;
+        this.portfolioService = portfolioService;
     }
 
     @Override
@@ -49,6 +52,13 @@ public class InvestmentServiceImpl implements InvestmentService {
     @Override
     @Transactional
     public Investment createInvestment(UUID portfolioId, CreateInvestmentRequest request) {
+        // Validate ticker after potential defaulting in controller
+        if (request.getTicker() == null || request.getTicker().isBlank()) {
+            // This case should ideally only be hit if type is not "Other" and ticker was blank,
+            // as "Other" types should have had ticker defaulted by PortfolioController.
+            throw new IllegalArgumentException("Ticker is required and was not provided or defaulted.");
+        }
+
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found with id: " + portfolioId));
 
@@ -271,5 +281,41 @@ public class InvestmentServiceImpl implements InvestmentService {
         Investment soldInvestment = investmentRepository.save(investment);
         logger.info("Marked investment {} as SOLD at price {}.", id, request.sellPrice());
         return soldInvestment;
+    }
+
+    @Override
+    @Transactional
+    public Investment manuallyUpdateInvestmentCurrentValue(UUID investmentId, BigDecimal newCurrentValue) {
+        Investment investment = investmentRepository.findById(investmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Investment not found with id: " + investmentId));
+
+        if (!"Other".equalsIgnoreCase(investment.getType())) {
+            logger.warn("Attempted to manually update current value for non-'Other' type investment ID: {}. Type: {}", investmentId, investment.getType());
+            throw new IllegalArgumentException("Manual value update is only allowed for investments of type 'Other'.");
+        }
+
+        if (newCurrentValue == null) {
+            throw new IllegalArgumentException("New current value cannot be null.");
+        }
+        if (newCurrentValue.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("New current value cannot be negative.");
+        }
+
+        logger.info("Manually updating current value for 'Other' investment ID: {} from {} to {}",
+                investmentId, investment.getCurrentValue(), newCurrentValue);
+
+        investment.setCurrentValue(newCurrentValue);
+        investment.setLastUpdateDate(LocalDateTime.now());
+        Investment savedInvestment = investmentRepository.save(investment);
+
+        // Trigger portfolio value recalculation
+        if (savedInvestment.getPortfolio() != null && savedInvestment.getPortfolio().getId() != null) {
+            logger.info("Triggering portfolio value update for portfolio ID: {} after manual investment update.", savedInvestment.getPortfolio().getId());
+            portfolioService.updatePortfolioValues(savedInvestment.getPortfolio().getId());
+        } else {
+            logger.warn("Cannot trigger portfolio value update for investment ID: {} as portfolio or portfolio ID is null.", investmentId);
+        }
+
+        return savedInvestment;
     }
 }

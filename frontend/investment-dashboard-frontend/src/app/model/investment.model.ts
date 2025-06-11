@@ -21,3 +21,23 @@ export interface Investment {
   profitOrLoss?: number;
   customName?: string;
 }
+
+export interface CreateInvestmentRequest {
+  portfolioId: number;
+  ticker: string;
+  type: string;
+  amount: number;
+  purchasePrice: number;
+  currency: string;
+  customName?: string;
+}
+
+export interface UpdateInvestmentRequest {
+  amount?: number;
+  purchasePrice?: number;
+  customName?: string;
+}
+
+export interface SellInvestmentRequest {
+  sellPrice: number;
+}

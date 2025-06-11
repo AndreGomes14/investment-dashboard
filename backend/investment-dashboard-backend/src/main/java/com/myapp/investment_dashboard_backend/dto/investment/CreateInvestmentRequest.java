@@ -17,8 +17,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CreateInvestmentRequest {
 
-    @NotBlank(message = "Ticker is required")
     private String ticker;
+    private String name;
 
     @NotBlank(message = "Type is required")
     private String type;

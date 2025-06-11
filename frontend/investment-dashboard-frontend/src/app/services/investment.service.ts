@@ -1,19 +1,21 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Observable, throwError, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment'; // Ensure correct path
 import { Investment } from '../model/investment.model'; // Assuming model exists
 import { HttpErrorResponse as ApiErrorResponse } from '@angular/common/http'; // Import HttpErrorResponse
 import { MatSnackBar } from '@angular/material/snack-bar'; // Import MatSnackBar
+import { UpdateInvestmentRequest } from '../model/investment.model';
+import { CreateInvestmentRequest } from '../model/investment.model';
+import { SellInvestmentRequest } from '../model/investment.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class InvestmentService {
-  private readonly investmentsApiUrl = environment.apiUrl + '/api/investments';
-  private readonly portfolioApiUrl = environment.apiUrl + '/api/portfolios'; // Need portfolio endpoint base
-  private baseUrl = '/api'; // Use this consistently
+  private apiUrl = `${environment.apiUrl}/api/investments`;
+  private portfolioApiUrl = `${environment.apiUrl}/api/portfolios`;
 
   constructor(private readonly http: HttpClient, private readonly snackBar: MatSnackBar) { } // Inject MatSnackBar
 
@@ -23,7 +25,7 @@ export class InvestmentService {
    * @returns Observable of Investment array or null on error/no data
    */
   getAllInvestments(): Observable<Investment[] | null> {
-    return this.http.get<Investment[]>(this.investmentsApiUrl).pipe(
+    return this.http.get<Investment[]>(this.apiUrl).pipe(
       map(investments => {
         return (Array.isArray(investments) && investments.length > 0) ? investments : null;
       }),
@@ -41,7 +43,7 @@ export class InvestmentService {
    * @returns Observable of Investment array or null on error/no data.
    */
   getInvestmentsByPortfolioId(portfolioId: number): Observable<Investment[] | null> {
-    const url = `${this.baseUrl}/portfolios/${portfolioId}/investments`;
+    const url = `${this.portfolioApiUrl}/${portfolioId}/investments`;
     console.log(`Fetching investments from: ${url}`);
     return this.http.get<Investment[]>(url).pipe(
       catchError(error => {
@@ -59,7 +61,7 @@ export class InvestmentService {
    * @returns Observable of the created Investment or null on error.
    */
   createInvestment(portfolioId: number, investmentData: any): Observable<Investment | null> {
-    const url = `${this.baseUrl}/portfolios/${portfolioId}/investments`;
+    const url = `${this.portfolioApiUrl}/${portfolioId}/investments`;
     console.log(`Attempting to create investment at: ${url}`, investmentData);
     return this.http.post<Investment>(url, investmentData).pipe(
       catchError((error: HttpErrorResponse) => {
@@ -77,7 +79,7 @@ export class InvestmentService {
    * @returns Observable<boolean> indicating success (true) or failure (false).
    */
   deleteInvestment(investmentId: string): Observable<boolean> {
-    const url = `${this.baseUrl}/investments/${investmentId}`;
+    const url = `${this.apiUrl}/${investmentId}`;
     console.log(`Attempting to delete (mark as deleted) investment at: ${url}`);
     return this.http.delete<void>(url, { observe: 'response' }) // Observe the full response
       .pipe(
@@ -99,7 +101,7 @@ export class InvestmentService {
    * @returns Observable of the updated Investment or null on error.
    */
   updateInvestment(investmentId: string, updateData: { amount?: number, purchasePrice?: number }): Observable<Investment | null> {
-    const url = `${this.baseUrl}/investments/${investmentId}`;
+    const url = `${this.apiUrl}/${investmentId}`;
     console.log(`Attempting to update investment at: ${url}`, updateData);
 
     // Construct payload with only the allowed updatable fields
@@ -123,7 +125,7 @@ export class InvestmentService {
 
   // Sell an investment (update status to SOLD)
   sellInvestment(investmentId: string, sellData: { sellPrice: number }): Observable<Investment | null> {
-    const url = `${this.baseUrl}/investments/${investmentId}/sell`;
+    const url = `${this.apiUrl}/${investmentId}/sell`;
     console.log(`Attempting to sell investment at: ${url} with data:`, sellData);
     // PATCH request with sellData in the body
     return this.http.patch<Investment>(url, sellData).pipe(
@@ -131,6 +133,47 @@ export class InvestmentService {
         console.error(`Error selling investment ${investmentId}:`, error);
         const errorMessage = error.error?.message || error.error?.error || 'Failed to mark investment as SOLD.';
         this.snackBar.open(`Error: ${errorMessage}`, 'Close', { duration: 5000 });
+        return of(null);
+      })
+    );
+  }
+
+  manuallyUpdateInvestmentCurrentValue(investmentId: number, newValue: number): Observable<Investment> {
+    const payload = { currentValue: newValue };
+    return this.http.put<Investment>(`${this.apiUrl}/${investmentId}/current-value`, payload)
+      .pipe(catchError(this.handleError));
+  }
+
+  private handleError(error: HttpErrorResponse) {
+    if (error.error instanceof ErrorEvent) {
+      // A client-side or network error occurred.
+      console.error('An error occurred:', error.error.message);
+    } else {
+      // The backend returned an unsuccessful response code.
+      console.error(
+        `Backend returned code ${error.status}, ` +
+        `body was: ${JSON.stringify(error.error)}`);
+    }
+    // Return an observable with a user-facing error message.
+    // Modify this to match how you generally handle errors and what your components expect (e.g., rethrow or return a specific error object).
+    return throwError(() => new Error('Something bad happened; please try again later. Review console for details.'));
+  }
+
+  getInvestmentsForPortfolio(portfolioId: string): Observable<Investment[]> {
+    return this.http.get<Investment[]>(`${this.portfolioApiUrl}/${portfolioId}/investments`);
+  }
+
+  /**
+   * Fetches a single investment by its ID.
+   * @param investmentId The ID of the investment.
+   * @returns Observable of the Investment or null on error.
+   */
+  getInvestmentById(investmentId: string): Observable<Investment | null> {
+    const url = `${this.apiUrl}/${investmentId}`;
+    return this.http.get<Investment>(url).pipe(
+      catchError(error => {
+        console.error(`Error fetching investment ${investmentId}:`, error);
+        this.snackBar.open(`Failed to load investment details.`, 'Close', { duration: 3000 });
         return of(null);
       })
     );

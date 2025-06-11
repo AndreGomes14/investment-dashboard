@@ -68,6 +68,17 @@ public class PortfolioController {
     public ResponseEntity<Investment> createInvestment(
             @PathVariable UUID portfolioId,
             @Valid @RequestBody CreateInvestmentRequest request) {
+
+        if ("Other".equalsIgnoreCase(request.getType()) && (request.getTicker() == null || request.getTicker().isBlank())) {
+            if (request.getName() != null && !request.getName().isBlank()) {
+                request.setTicker(request.getName());
+                logger.info("Ticker set from investment name '{}' for type 'Other' in portfolio {}", request.getName(), portfolioId);
+            } else {
+                request.setTicker("OTHER_ASSET"); // Fallback if name is also blank
+                logger.info("Default ticker 'OTHER_ASSET' set for type 'Other' with no name/ticker in portfolio {}", portfolioId);
+            }
+        }
+
         Investment createdInvestment = investmentService.createInvestment(portfolioId, request);
         return new ResponseEntity<>(createdInvestment, HttpStatus.CREATED);
     }

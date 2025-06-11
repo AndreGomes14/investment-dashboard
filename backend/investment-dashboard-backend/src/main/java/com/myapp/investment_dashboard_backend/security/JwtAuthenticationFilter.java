@@ -49,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // Skip filter for auth endpoints
-        return path.startsWith("/auth/") || path.startsWith("/public/");
+        return path.startsWith("/api/auth/") || path.startsWith("/auth/") || path.startsWith("/public/");
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {

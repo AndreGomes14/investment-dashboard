@@ -2,6 +2,7 @@ package com.myapp.investment_dashboard_backend.controller;
 
 import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentValueRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import com.myapp.investment_dashboard_backend.service.impl.InvestmentServiceImpl;
 import jakarta.validation.Valid;
@@ -99,5 +100,14 @@ public class InvestmentController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    // New endpoint to manually update current value for an investment
+    @PutMapping("/{id}/current-value")
+    public ResponseEntity<Investment> manuallyUpdateInvestmentCurrentValue(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateInvestmentValueRequest request) {
+        Investment updatedInvestment = investmentService.manuallyUpdateInvestmentCurrentValue(id, request.getCurrentValue());
+        return ResponseEntity.ok(updatedInvestment);
     }
 }

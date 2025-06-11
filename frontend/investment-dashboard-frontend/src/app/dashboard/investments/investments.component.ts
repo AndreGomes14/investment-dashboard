@@ -68,6 +68,7 @@ export class InvestmentsComponent implements OnInit {
   isUpdatingPortfolio: boolean = false;
   isDeletingPortfolio: boolean = false;
   isLoadingInvestments: boolean = false;
+  isUpdatingInvestmentValue: boolean = false;
   portfolios: Portfolio[] | null = null;
   selectedPortfolioId: number | null = null;
   investmentsForSelectedPortfolio: Investment[] | null = null;
@@ -586,5 +587,39 @@ export class InvestmentsComponent implements OnInit {
     });
 
     this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));
+  }
+
+  promptAndUpdateValue(investment: Investment): void {
+    const newValueString = window.prompt(`Enter new current value for ${investment.ticker}:`, investment.currentValue?.toString() || '0');
+    if (newValueString === null) {
+      this.snackBar.open('Update cancelled.', 'Close', { duration: 2000 });
+      return; // User cancelled
+    }
+
+    const newValue = parseFloat(newValueString);
+    if (isNaN(newValue) || newValue < 0) {
+      this.snackBar.open('Invalid value entered. Please enter a positive number.', 'Close', { duration: 3000, panelClass: ['error-snackbar'] });
+      return;
+    }
+
+    if (!investment.id) {
+      this.snackBar.open('Investment ID is missing. Cannot update.', 'Close', { duration: 3000, panelClass: ['error-snackbar'] });
+      return;
+    }
+
+    this.isUpdatingInvestmentValue = true;
+    this.investmentService.manuallyUpdateInvestmentCurrentValue(investment.id, newValue)
+      .pipe(finalize(() => this.isUpdatingInvestmentValue = false))
+      .subscribe({
+        next: (updatedInvestment: Investment) => {
+          this.snackBar.open(`Value for ${updatedInvestment.ticker} updated successfully.`, 'Close', { duration: 3000 });
+          this.loadDataForSelection();
+        },
+        error: (err: any) => {
+          console.error('Error updating investment value:', err);
+          const errorMessage = err.error?.message || 'Failed to update investment value. Please try again.';
+          this.snackBar.open(errorMessage, 'Close', { duration: 5000, panelClass: ['error-snackbar'] });
+        }
+      });
   }
 }
