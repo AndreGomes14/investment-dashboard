@@ -95,23 +95,20 @@ export class InvestmentService {
 
   /**
    * Updates an existing investment.
-   * Sends only the fields that can be updated (amount, purchasePrice).
+   * Sends only the fields that can be updated (amount, purchasePrice, currentValue).
    * @param investmentId The ID of the investment to update.
-   * @param updateData An object containing the fields to update (e.g., { amount: number, purchasePrice: number }).
+   * @param updateData An object containing the fields to update (e.g., { amount: number, purchasePrice: number, currentValue: number }).
    * @returns Observable of the updated Investment or null on error.
    */
-  updateInvestment(investmentId: string, updateData: { amount?: number, purchasePrice?: number }): Observable<Investment | null> {
+  updateInvestment(investmentId: string, updateData: { amount?: number, purchasePrice?: number, currentValue?: number }): Observable<Investment | null> {
     const url = `${this.apiUrl}/${investmentId}`;
     console.log(`Attempting to update investment at: ${url}`, updateData);
 
-    // Construct payload with only the allowed updatable fields
+    // Construct payload with only provided fields
     const backendPayload: any = {};
-    if (updateData.amount !== undefined) {
-      backendPayload.amount = updateData.amount;
-    }
-    if (updateData.purchasePrice !== undefined) {
-      backendPayload.purchasePrice = updateData.purchasePrice;
-    }
+    if (updateData.amount !== undefined) backendPayload.amount = updateData.amount;
+    if (updateData.purchasePrice !== undefined) backendPayload.purchasePrice = updateData.purchasePrice;
+    if (updateData.currentValue !== undefined) backendPayload.currentValue = updateData.currentValue;
 
     return this.http.put<Investment>(url, backendPayload).pipe(
       catchError((error: HttpErrorResponse) => {

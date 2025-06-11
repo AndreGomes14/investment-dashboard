@@ -16,6 +16,7 @@ export interface EditInvestmentDialogData {
 export interface EditInvestmentDialogResult {
   amount: number;
   purchasePrice: number;
+  currentValue?: number;
 }
 
 @Component({
@@ -49,6 +50,11 @@ export class EditInvestmentDialogComponent implements OnInit {
       amount: [this.investment.amount, [Validators.required, Validators.min(0.000001)]],
       purchasePrice: [this.investment.purchasePrice, [Validators.required, Validators.min(0)]]
     });
+
+    // Add currentValue field only for OTHER type
+    if (this.investment.type?.toUpperCase() === 'OTHER') {
+      this.investmentForm.addControl('currentValue', this.fb.control(this.investment.currentValue ?? null, [Validators.required, Validators.min(0)]));
+    }
   }
 
   ngOnInit(): void { }
@@ -61,8 +67,11 @@ export class EditInvestmentDialogComponent implements OnInit {
     if (this.investmentForm.valid) {
       const result: EditInvestmentDialogResult = {
         amount: this.investmentForm.value.amount,
-        purchasePrice: this.investmentForm.value.purchasePrice
-      };
+        purchasePrice: this.investmentForm.value.purchasePrice,
+      } as EditInvestmentDialogResult;
+      if (this.investmentForm.contains('currentValue')) {
+        result.currentValue = this.investmentForm.value.currentValue;
+      }
       this.dialogRef.close(result);
     } else {
       console.error("Edit form is invalid", this.investmentForm.errors);

@@ -386,7 +386,7 @@ export class InvestmentsComponent implements OnInit {
         console.log('Edit Investment Dialog closed with data:', result);
         const investmentIdStr = String(investment.id);
 
-        this.investmentService.updateInvestment(investmentIdStr, result)
+        this.investmentService.updateInvestment(investmentIdStr, result as any)
           .subscribe(updatedInvestment => {
             if (updatedInvestment) {
               this.snackBar.open(`Investment '${updatedInvestment.ticker}' updated successfully!`, 'Close', { duration: 3000 });

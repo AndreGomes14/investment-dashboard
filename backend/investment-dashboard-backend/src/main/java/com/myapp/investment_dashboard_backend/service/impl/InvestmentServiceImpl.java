@@ -163,6 +163,9 @@ public class InvestmentServiceImpl implements InvestmentService {
         if (request.getPurchasePrice() != null) {
             investment.setPurchasePrice(request.getPurchasePrice());
         }
+        if (request.getCurrentValue() != null) {
+            investment.setCurrentValue(request.getCurrentValue());
+        }
         investment.setLastUpdateDate(LocalDateTime.now());
     }
 
