@@ -19,14 +19,13 @@
         <mat-hint>This currency will be used for displaying values across the dashboard.</mat-hint>
       </mat-form-field>
 
-      <!-- Add other settings fields here later -->
-      <!-- e.g., Theme (Light/Dark), Notifications, etc. -->
+      <mat-slide-toggle [(ngModel)]="darkMode" (change)="onDarkModeChange($event.checked)" color="primary" class="settings-field" name="darkMode">
+        Dark Mode
+      </mat-slide-toggle>
+
+      <!-- Additional preferences can go here -->
 
     </mat-card-content>
-    <mat-card-actions align="end">
-      <button mat-raised-button color="primary">Save Preferences</button>
-      <!-- TODO: Implement save logic -->
-    </mat-card-actions>
   </mat-card>
 
   <!-- Add other sections like Profile Information, Security, etc. later -->

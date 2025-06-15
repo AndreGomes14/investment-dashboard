@@ -69,7 +69,16 @@ public class InvestmentServiceImpl implements InvestmentService {
         Investment savedInvestment = investmentRepository.save(investment);
         logger.info("Successfully saved initial investment with ID: {}", savedInvestment.getId());
 
-        return fetchAndSetInitialCurrentValue(savedInvestment);
+        Investment finalInvestment = fetchAndSetInitialCurrentValue(savedInvestment);
+
+        // Recalculate portfolio totals and record user history to keep statistics up to date after adding a new investment
+        try {
+            portfolioService.updatePortfolioValues(portfolioId);
+        } catch (Exception e) {
+            logger.error("Failed to recalculate portfolio {} values after creating investment {}: {}", portfolioId, finalInvestment.getId(), e.getMessage(), e);
+        }
+
+        return finalInvestment;
     }
 
     private Investment mapToNewInvestment(CreateInvestmentRequest request, Portfolio portfolio) {
@@ -83,10 +92,23 @@ public class InvestmentServiceImpl implements InvestmentService {
         investment.setStatus(StatusInvestment.ACTIVE);
         investment.setSellPrice(request.getPurchasePrice());
         investment.setLastUpdateDate(LocalDateTime.now());
+        // Set custom name if provided (used for 'Other' asset types or descriptive alias)
+        if (request.getName() != null && !request.getName().isBlank()) {
+            investment.setCustomName(request.getName());
+        }
+        // If the user supplied a current value (e.g., for 'Other' assets), persist it directly.
+        if (request.getCurrentValue() != null) {
+            investment.setCurrentValue(request.getCurrentValue());
+        }
         return investment;
     }
 
     private Investment fetchAndSetInitialCurrentValue(Investment investment) {
+        // If current value already set (e.g., for "Other" type entered by the user), just persist and return.
+        if (investment.getCurrentValue() != null) {
+            return investmentRepository.save(investment);
+        }
+
         if (!isInvestmentCurrencyValid(investment)) {
             logger.warn("Cannot fetch initial current value for investment {} due to invalid currency.", investment.getId());
             return investment;

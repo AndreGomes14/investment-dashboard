@@ -5,6 +5,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatInputModule } from '@angular/material/input';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { PreferenceService } from '../../services/preference.service';
 
 interface Currency {
   value: string;
@@ -20,7 +22,8 @@ interface Currency {
     MatFormFieldModule,
     MatSelectModule,
     MatCardModule,
-    MatInputModule
+    MatInputModule,
+    MatSlideToggleModule
   ],
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.css']
@@ -36,15 +39,22 @@ export class SettingsComponent implements OnInit {
   ];
 
   selectedCurrency: string = 'USD';
+  darkMode: boolean = false;
 
-  constructor() { }
+  constructor(private prefSvc: PreferenceService) { }
 
   ngOnInit(): void {
-    console.log('Settings component initialized. Default currency:', this.selectedCurrency);
+    this.selectedCurrency = this.prefSvc.currentCurrency;
+    this.darkMode = this.prefSvc.isDarkMode;
   }
 
   onCurrencyChange(newValue: string): void {
     this.selectedCurrency = newValue;
-    console.log('Currency changed to:', this.selectedCurrency);
+    this.prefSvc.changeCurrency(newValue);
+  }
+
+  onDarkModeChange(enabled: boolean): void {
+    this.darkMode = enabled;
+    this.prefSvc.setDarkMode(enabled);
   }
 }

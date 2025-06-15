@@ -6,12 +6,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { Observable, switchMap, of, tap, map, BehaviorSubject, combineLatest, startWith, catchError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 
 import { PortfolioService, PortfolioSummaryResponse, PortfolioSummaryMetrics, InvestmentPerformance, HistoricalDataPoint } from '../../services/portfolio.service';
+import { AllocationDetailsDialogComponent } from './allocation-details-dialog.component';
+import { PreferenceService } from '../../services/preference.service';
 
 interface ChartDataPoint {
   name: string;
@@ -39,6 +42,7 @@ export interface LineChartSeries {
     MatTableModule,
     MatProgressSpinnerModule,
     MatButtonToggleModule,
+    MatDialogModule,
     RouterLink,
     NgxChartsModule
   ],
@@ -53,6 +57,7 @@ export class PortfolioComponent implements OnInit {
   // Properties for animated display values
   displayTotalValue: number = 0;
   displayUnrealizedPnlAbsolute: number = 0;
+  preferredCurrency: string = 'USD';
   // Add more for other stats if needed, e.g., displayRealizedPnlAbsolute
 
   allocationChartData$: Observable<ChartDataPoint[]> = of([]);
@@ -64,6 +69,15 @@ export class PortfolioComponent implements OnInit {
   };
   isLoadingSummary = true;
   isRefreshingValues = false;
+
+  // Currency Allocation
+  currencyAllocationChartData$: Observable<ChartDataPoint[]> = of([]);
+  currencyColorScheme: Color = {
+    name: 'currencyAllocation',
+    selectable: true,
+    group: ScaleType.Ordinal,
+    domain: ['#0288d1', '#8e24aa', '#f44336', '#43a047', '#ffb300', '#6d4c41']
+  };
 
   // For Historical Chart
   historicalData$: Observable<LineChartSeries[] | null> = of(null);
@@ -95,10 +109,15 @@ export class PortfolioComponent implements OnInit {
     private readonly portfolioService: PortfolioService,
     private readonly snackBar: MatSnackBar,
     private readonly route: ActivatedRoute,
-    private readonly datePipe: DatePipe
+    private readonly datePipe: DatePipe,
+    private readonly dialog: MatDialog,
+    private readonly prefSvc: PreferenceService
   ) {}
 
   ngOnInit(): void {
+    // update preferredCurrency now that prefSvc is available
+    this.preferredCurrency = this.prefSvc.currentCurrency;
+
     const paramMap$ = this.route.paramMap.pipe(
       tap(params => {
         const id = params.get('id');
@@ -147,6 +166,17 @@ export class PortfolioComponent implements OnInit {
           return [];
         }
         return Object.entries(summaryData.summary.assetAllocationByValue)
+          .map(([key, value]) => ({ name: key, value: value }));
+      })
+    );
+
+    // Currency allocation
+    this.currencyAllocationChartData$ = this.summaryData$.pipe(
+      map(summaryData => {
+        if (!summaryData?.summary?.currencyAllocationByValue) {
+          return [];
+        }
+        return Object.entries(summaryData.summary.currencyAllocationByValue)
           .map(([key, value]) => ({ name: key, value: value }));
       })
     );
@@ -221,6 +251,12 @@ export class PortfolioComponent implements OnInit {
       }),
       startWith([]) 
     );
+
+    // refresh when currency preference changes
+    this.prefSvc.currencyChanges.subscribe(cur => {
+      this.preferredCurrency = cur;
+      this.refreshTrigger$.next();
+    });
   }
 
   // Method to change time range for historical chart
@@ -349,6 +385,41 @@ export class PortfolioComponent implements OnInit {
         // If neither next nor error was called but observable completed (unlikely for typical HTTP calls),
         // we might still want to trigger:
         // if (!operationCompleted) { this.refreshTrigger$.next(); }
+      }
+    });
+  }
+
+  openAllocationDetails(): void {
+    this.summaryData$.pipe(
+      map(summaryData => {
+        if (!summaryData) return null;
+        return {
+          allocationData: Object.entries(summaryData.summary.assetAllocationByValue)
+            .map(([name, value]) => ({ name, value })),
+          investments: summaryData.activeInvestments,
+          totalValue: summaryData.summary.totalValue
+        };
+      })
+    ).subscribe(data => {
+      if (data) {
+        this.dialog.open(AllocationDetailsDialogComponent, {
+          data,
+          width: '800px'
+        });
+      }
+    });
+  }
+
+  async openCurrencyAllocationDetails(): Promise<void> {
+    const currentSummary = this.previousSummaryMetrics;
+    if (!currentSummary?.currencyAllocationByValue) return;
+
+    const { CurrencyAllocationDetailsDialogComponent } = await import('./currency-allocation-details-dialog.component');
+
+    this.dialog.open(CurrencyAllocationDetailsDialogComponent, {
+      width: '450px',
+      data: {
+        allocation: currentSummary.currencyAllocationByValue
       }
     });
   }

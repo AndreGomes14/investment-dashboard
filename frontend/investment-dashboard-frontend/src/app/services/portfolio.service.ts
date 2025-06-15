@@ -24,6 +24,7 @@ export interface PortfolioSummaryMetrics {
   unrealizedPnlPercentage: number;
   realizedPnlAbsolute: number;
   assetAllocationByValue: { [key: string]: number }; // Map<string, number>
+  currencyAllocationByValue: { [currency: string]: number };
   activeInvestmentsCount: number;
   bestPerformer: InvestmentPerformance | null;
   worstPerformer: InvestmentPerformance | null;

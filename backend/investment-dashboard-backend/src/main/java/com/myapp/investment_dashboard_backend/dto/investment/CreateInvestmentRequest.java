@@ -34,5 +34,9 @@ public class CreateInvestmentRequest {
     @NotNull(message = "Currency is required")
     @Size(min = 3, max = 3, message = "Currency code must be 3 characters")
     private String currency;
+
+    // Optional. For assets of type "Other" the user can supply the current value per unit.
+    @DecimalMin(value = "0.0000", inclusive = false, message = "Current value must be positive")
+    private BigDecimal currentValue;
 }
 

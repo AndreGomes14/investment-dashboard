@@ -28,8 +28,9 @@
 
 .metric-card {
   flex: 1;
-  min-width: 280px;
+  min-width: 220px;
   transition: transform 0.2s;
+  position: relative;
 }
 
 .metric-card:hover {
@@ -213,4 +214,15 @@ body.chart-fullscreen-active {
    A simpler approach is to rely on the fixed positioning and z-index of the chart card itself. */
 app-root > *:not(.fullscreen-chart-card) {
   /* display: none; */ /* This might be too aggressive, use with caution */
+}
+
+.details-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.details-button:hover {
+  color: rgba(0, 0, 0, 0.87);
 }

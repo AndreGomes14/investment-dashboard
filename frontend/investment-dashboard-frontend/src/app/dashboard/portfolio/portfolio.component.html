@@ -36,12 +36,23 @@
     <div class="metrics-row">
       <mat-card class="metric-card">
         <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">payments</mat-icon>
+          <mat-card-title>Total Invested</mat-card-title>
+          <mat-card-subtitle>Cost Basis</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <h2 class="metric-value">{{ summaryData.summary.totalCostBasis | currency:preferredCurrency:'symbol':'1.2-2' }}</h2>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="metric-card">
+        <mat-card-header>
           <mat-icon mat-card-avatar class="metric-icon">account_balance_wallet</mat-icon>
           <mat-card-title>Total Value</mat-card-title>
           <mat-card-subtitle>Active Holdings</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
-          <h2 class="metric-value">{{ displayTotalValue | currency:'USD':'symbol':'1.2-2' }}</h2>
+          <h2 class="metric-value">{{ displayTotalValue | currency:preferredCurrency:'symbol':'1.2-2' }}</h2>
         </mat-card-content>
       </mat-card>
 
@@ -53,7 +64,7 @@
         </mat-card-header>
         <mat-card-content>
           <h2 class="metric-value" [ngClass]="displayUnrealizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
-            {{ displayUnrealizedPnlAbsolute | currency:'USD':'symbol':'1.2-2' }}
+            {{ displayUnrealizedPnlAbsolute | currency:preferredCurrency:'symbol':'1.2-2' }}
           </h2>
           <div class="metric-change" [ngClass]="summaryData.summary.unrealizedPnlPercentage >= 0 ? 'positive' : 'negative'">
             <mat-icon>{{ summaryData.summary.unrealizedPnlPercentage >= 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
@@ -70,16 +81,22 @@
         </mat-card-header>
         <mat-card-content>
           <h2 class="metric-value" [ngClass]="summaryData.summary.realizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
-            {{ summaryData.summary.realizedPnlAbsolute | currency:'USD':'symbol':'1.2-2' }}
+            {{ summaryData.summary.realizedPnlAbsolute | currency:preferredCurrency:'symbol':'1.2-2' }}
           </h2>
         </mat-card-content>
       </mat-card>
+    </div>
 
+    <div class="metrics-row">
+      <!-- Asset Allocation Card -->
       <mat-card class="metric-card">
         <mat-card-header>
           <mat-icon mat-card-avatar class="metric-icon">pie_chart</mat-icon>
           <mat-card-title>Asset Allocation</mat-card-title>
           <mat-card-subtitle>By Current Value</mat-card-subtitle>
+          <button mat-icon-button class="details-button" (click)="openAllocationDetails()">
+            <mat-icon>info</mat-icon>
+          </button>
         </mat-card-header>
         <mat-card-content>
           <div *ngIf="allocationChartData$ | async as chartData; else noChartData" style="height: 200px;">
@@ -97,6 +114,37 @@
             </div>
           </div>
           <ng-template #noChartData>
+            <div class="allocation-chart-placeholder">Loading chart...</div>
+          </ng-template>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Currency Allocation Card -->
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">public</mat-icon>
+          <mat-card-title>Currency Allocation</mat-card-title>
+          <mat-card-subtitle>By Current Value</mat-card-subtitle>
+          <button mat-icon-button class="details-button" (click)="openCurrencyAllocationDetails()">
+            <mat-icon>info</mat-icon>
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          <div *ngIf="currencyAllocationChartData$ | async as curData; else noCurrencyData" style="height: 200px;">
+            <ngx-charts-pie-chart
+              *ngIf="curData.length > 0"
+              [results]="curData"
+              [legend]="false"
+              [labels]="true"
+              [doughnut]="true"
+              [arcWidth]="0.25"
+              [scheme]="currencyColorScheme">
+            </ngx-charts-pie-chart>
+            <div *ngIf="curData.length === 0" class="allocation-chart-placeholder">
+              No currency allocation data (value might be zero).
+            </div>
+          </div>
+          <ng-template #noCurrencyData>
             <div class="allocation-chart-placeholder">Loading chart...</div>
           </ng-template>
         </mat-card-content>
@@ -239,6 +287,7 @@
               <th>Sell Price</th>
               <th>Date Sold</th>
               <th>Realized PnL</th>
+              <th>Profit %</th>
             </tr>
             </thead>
             <tbody>
@@ -251,12 +300,21 @@
               <td>{{ investment.lastUpdateDate | date:'shortDate' }}</td>
               <td>
                    <span class="profit-value"
-                         *ngIf="investment.realizedPnl !== null"
-                         [class.positive]="(investment.realizedPnl ?? 0) > 0"
-                         [class.negative]="(investment.realizedPnl ?? 0) < 0">
-                      {{ investment.realizedPnl | currency:investment.currency:'symbol':'1.2-2' }}
+                         *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null"
+                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
+                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
+                       {{ ((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) * (investment.amount ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}
                    </span>
-                <span class="unavailable" *ngIf="investment.realizedPnl === null">N/A</span>
+                <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null">N/A</span>
+              </td>
+              <td>
+                   <span class="profit-value"
+                         *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null && investment.purchasePrice !== 0"
+                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
+                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
+                       {{ (((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) / (investment.purchasePrice ?? 1)) | percent:'1.2-2' }}
+                   </span>
+                <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null || investment.purchasePrice === 0">N/A</span>
               </td>
             </tr>
             </tbody>

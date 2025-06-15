@@ -29,6 +29,7 @@ public class PortfolioSummaryResponse {
         private BigDecimal unrealizedPnlPercentage;
         private BigDecimal realizedPnlAbsolute;
         private Map<String, BigDecimal> assetAllocationByValue;
+        private Map<String, BigDecimal> currencyAllocationByValue;
 
         private int activeInvestmentsCount;
         private InvestmentPerformanceDTO bestPerformer;

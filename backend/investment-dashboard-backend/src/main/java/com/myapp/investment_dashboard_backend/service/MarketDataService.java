@@ -20,6 +20,18 @@ public interface MarketDataService {
     PriceInfo getCurrentValue(String ticker, String type, String targetCurrency) throws IOException;
 
     /**
+     * Retrieves the current value and currency of a financial instrument.
+     *
+     * @param ticker The ticker symbol of the financial instrument.
+     * @param type   The type of asset (e.g., "stock", "crypto").
+     * @param targetCurrency The expected currency of the investment.
+     * @param forceRefresh Whether to force a refresh of the data.
+     * @return A PriceInfo object containing the value and currency, or null if the value cannot be retrieved.
+     * @throws IOException if there is an error parsing the JSON response.
+     */
+    PriceInfo getCurrentValue(String ticker, String type, String targetCurrency, boolean forceRefresh) throws IOException;
+
+    /**
      * Searches for financial instruments using external APIs.
      * @param query The search keyword string.
      * @return A list of matching instruments.

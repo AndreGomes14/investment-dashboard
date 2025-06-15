@@ -67,6 +67,11 @@ public class MarketDataServiceImpl implements MarketDataService {
 
     @Override
     public PriceInfo getCurrentValue(String ticker, String type, String targetCurrency) throws IOException {
+        return getCurrentValue(ticker, type, targetCurrency, false);
+    }
+
+    @Override
+    public PriceInfo getCurrentValue(String ticker, String type, String targetCurrency, boolean forceRefresh) throws IOException {
         if (targetCurrency == null || targetCurrency.trim().isEmpty()) {
             logger.warn("Target currency not provided for {}:{} lookup.", type, ticker);
             return null;
@@ -76,7 +81,7 @@ public class MarketDataServiceImpl implements MarketDataService {
 
         Optional<ExternalApiCache> existingCacheEntryOpt = externalApiCacheRepository.findByTickerAndType(ticker, effectiveType);
 
-        if (existingCacheEntryOpt.isPresent()) {
+        if (!forceRefresh && existingCacheEntryOpt.isPresent()) {
             ExternalApiCache existingCache = existingCacheEntryOpt.get();
             if (isCacheValid(existingCache, effectiveTargetCurrency)) {
                 logger.debug("Cache hit for {}:{}. Returning cached value.", effectiveType, ticker);
@@ -84,7 +89,7 @@ public class MarketDataServiceImpl implements MarketDataService {
             }
         }
 
-        logger.debug("Cache miss or invalid for {}:{}. Fetching from API.", effectiveType, ticker);
+        logger.debug("Cache miss, invalid, or force refresh for {}:{}. Fetching from API.", effectiveType, ticker);
         PriceInfo currentPriceInfo = fetchCurrentValueFromAPI(ticker, effectiveType, effectiveTargetCurrency);
 
         if (currentPriceInfo != null) {

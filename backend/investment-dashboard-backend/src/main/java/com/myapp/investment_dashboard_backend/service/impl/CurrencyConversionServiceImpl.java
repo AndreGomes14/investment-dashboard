@@ -110,7 +110,15 @@ public class CurrencyConversionServiceImpl implements CurrencyConversionService 
 
         try {
             String response = restTemplate.getForObject(url, String.class);
-            return parseApiResponse(response, sourceCurrency, targetCurrency, url);
+            BigDecimal directRate = parseApiResponse(response, sourceCurrency, targetCurrency, url);
+            if (directRate != null) return directRate;
+
+            // Fallback: fetch USD base and derive cross-rate
+            String usdUrl = String.format("https://v6.exchangerate-api.com/v6/%s/latest/USD", exchangeRateApiKey);
+            logger.debug("Fallback FX: fetching USD base rates: {}", usdUrl);
+            String usdResp = restTemplate.getForObject(usdUrl, String.class);
+            BigDecimal cross = deriveCrossRateFromUsd(usdResp, sourceCurrency, targetCurrency, usdUrl);
+            return cross;
         } catch (HttpClientErrorException e) {
             logger.error("HTTP error fetching exchange rates for base {}: {} {}. URL: {}", sourceCurrency, e.getStatusCode(), e.getResponseBodyAsString(), url, e);
             return null;
@@ -172,5 +180,25 @@ public class CurrencyConversionServiceImpl implements CurrencyConversionService 
             return true;
         }
         return false;
+    }
+
+    private BigDecimal deriveCrossRateFromUsd(String responseBody, String sourceCurrency, String targetCurrency, String url) throws IOException {
+        JsonNode root = objectMapper.readTree(responseBody);
+        if (!"success".equalsIgnoreCase(root.path("result").asText())) {
+            logger.error("USD-base ExchangeRate-API error. URL: {}", url);
+            return null;
+        }
+        JsonNode ratesNode = root.path("conversion_rates");
+        JsonNode usdToSrcNode = ratesNode.path(sourceCurrency);
+        JsonNode usdToTgtNode = ratesNode.path(targetCurrency);
+        if (usdToSrcNode.isMissingNode() || !usdToSrcNode.isNumber() || usdToTgtNode.isMissingNode() || !usdToTgtNode.isNumber()) {
+            logger.error("USD-base rates missing {} or {}. URL: {}", sourceCurrency, targetCurrency, url);
+            return null;
+        }
+        BigDecimal usdToSrc = usdToSrcNode.decimalValue();
+        BigDecimal usdToTgt = usdToTgtNode.decimalValue();
+        if (usdToSrc.compareTo(BigDecimal.ZERO) == 0) return null;
+        BigDecimal srcToUsd = BigDecimal.ONE.divide(usdToSrc, 8, RoundingMode.HALF_UP);
+        return usdToTgt.multiply(srcToUsd).setScale(6, RoundingMode.HALF_UP);
     }
 }

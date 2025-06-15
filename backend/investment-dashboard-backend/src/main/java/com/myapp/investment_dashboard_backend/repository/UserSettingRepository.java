@@ -11,4 +11,5 @@ import java.util.UUID;
 
 @Repository
 public interface UserSettingRepository extends JpaRepository<UserSetting, UUID> {
+    Optional<UserSetting> findByUserIdAndKey(UUID userId, String key);
 }

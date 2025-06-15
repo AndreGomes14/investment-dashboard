@@ -31,6 +31,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -49,6 +51,9 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final MarketDataService marketDataService;
     private final CurrencyConversionService currencyConversionService;
     private static final Logger logger = LoggerFactory.getLogger(PortfolioServiceImpl.class);
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Autowired
     public PortfolioServiceImpl(PortfolioRepository portfolioRepository,
@@ -151,6 +156,30 @@ public class PortfolioServiceImpl implements PortfolioService {
         }
 
         try {
+            // Special handling for custom assets (type 'Other') which rely solely on user-provided currentValue.
+            if ("Other".equalsIgnoreCase(investment.getType())) {
+                if (investment.getCurrentValue() == null) {
+                    logger.warn("{} Investment type 'Other' does not have currentValue set. Skipping and returning null.", logPrefix);
+                    return null;
+                }
+
+                BigDecimal holdingValue = investment.getCurrentValue().multiply(investment.getAmount());
+
+                String sourceCurrency = investment.getCurrency().toUpperCase();
+                if (sourceCurrency.equalsIgnoreCase(preferredCurrency)) {
+                    logger.debug("{} Using user-provided currentValue for 'Other' asset. HoldingValue: {} {} (no conversion needed)", logPrefix, holdingValue, sourceCurrency);
+                    return holdingValue;
+                } else {
+                    logger.debug("{} Converting user-provided holdingValue {} from {} to preferred currency {}", logPrefix, holdingValue, sourceCurrency, preferredCurrency);
+                    BigDecimal converted = currencyConversionService.convert(holdingValue, sourceCurrency, preferredCurrency);
+                    if (converted == null) {
+                        logger.error("{} Currency conversion failed for 'Other' asset from {} to {}. Returning null.", logPrefix, sourceCurrency, preferredCurrency);
+                        return null;
+                    }
+                    return converted;
+                }
+            }
+
             Optional<PriceInfo> priceInfoOpt = fetchAndValidateCorePriceInfo(investment, logPrefix);
             if (priceInfoOpt.isEmpty()) {
                 return null; // Error already logged by helper
@@ -375,18 +404,28 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<Investment> soldInvestments = categorized.sold();
 
         Map<String, BigDecimal> valueByType = new HashMap<>();
+        Map<String, BigDecimal> valueByCurrency = new HashMap<>();
+
+        // Determine preferred currency of current user (default to USD if not set)
+        User currentUser = getCurrentUser();
+        String preferredCurrency = getUserPreferredCurrency(currentUser);
+
+        logger.debug("Calculating summary for portfolio '{}' using preferred currency '{}'.", portfolioName, preferredCurrency);
+
         PortfolioSummaryAggregators aggregators = new PortfolioSummaryAggregators();
 
         for (Investment inv : activeInvestments) {
-            processActiveInvestmentForSummary(inv, aggregators, valueByType);
+            processActiveInvestmentForSummary(inv, aggregators, valueByType, valueByCurrency, preferredCurrency);
         }
         
         PortfolioSummaryResponse.SummaryMetrics metrics = buildSummaryMetrics(
             portfolioName, 
             aggregators, 
             valueByType, 
+            valueByCurrency,
             soldInvestments, 
-            activeInvestments.size()
+            activeInvestments.size(),
+            preferredCurrency
         );
         
         return new PortfolioSummaryResponse(metrics, activeInvestments, soldInvestments);
@@ -396,16 +435,19 @@ public class PortfolioServiceImpl implements PortfolioService {
             String portfolioName,
             PortfolioSummaryAggregators aggregators,
             Map<String, BigDecimal> valueByType,
+            Map<String, BigDecimal> valueByCurrency,
             List<Investment> soldInvestments,
-            int activeInvestmentCount) {
+            int activeInvestmentCount,
+            String preferredCurrency) {
 
         BigDecimal totalValue = aggregators.totalValue;
         BigDecimal totalCostBasis = aggregators.totalCostBasis;
 
         BigDecimal unrealizedPnlAbsolute = totalValue.subtract(totalCostBasis);
         BigDecimal unrealizedPnlPercentage = calculatePnlPercentage(unrealizedPnlAbsolute, totalCostBasis);
-        BigDecimal realizedPnlAbsolute = calculateRealizedPnl(soldInvestments);
+        BigDecimal realizedPnlAbsolute = calculateRealizedPnlInPreferredCurrency(soldInvestments, preferredCurrency);
         Map<String, BigDecimal> assetAllocationPercentage = calculateAssetAllocation(valueByType, totalValue);
+        Map<String, BigDecimal> currencyAllocationPercentage = calculateAssetAllocation(valueByCurrency, totalValue);
 
         return new PortfolioSummaryResponse.SummaryMetrics(
                 portfolioName,
@@ -415,19 +457,20 @@ public class PortfolioServiceImpl implements PortfolioService {
                 unrealizedPnlPercentage.setScale(2, RoundingMode.HALF_UP),
                 realizedPnlAbsolute.setScale(2, RoundingMode.HALF_UP),
                 assetAllocationPercentage,
+                currencyAllocationPercentage,
                 activeInvestmentCount,
                 aggregators.bestPerformer,
                 aggregators.worstPerformer
         );
     }
 
-    private void processActiveInvestmentForSummary(Investment inv, PortfolioSummaryAggregators aggregators, Map<String, BigDecimal> valueByType) {
+    private void processActiveInvestmentForSummary(Investment inv, PortfolioSummaryAggregators aggregators, Map<String, BigDecimal> valueByType, Map<String, BigDecimal> valueByCurrency, String preferredCurrency) {
         BigDecimal purchasePrice = inv.getPurchasePrice() != null ? inv.getPurchasePrice() : BigDecimal.ZERO;
         BigDecimal amount = inv.getAmount() != null ? inv.getAmount() : BigDecimal.ZERO;
         
         BigDecimal resolvedCurrentValue = resolveCurrentValueForSummary(inv, purchasePrice);
 
-        calculateAndAggregateInvestmentSummaryMetrics(inv, resolvedCurrentValue, purchasePrice, amount, aggregators, valueByType);
+        calculateAndAggregateInvestmentSummaryMetrics(inv, resolvedCurrentValue, purchasePrice, amount, aggregators, valueByType, valueByCurrency, preferredCurrency);
     }
 
     private BigDecimal resolveCurrentValueForSummary(Investment inv, BigDecimal purchasePriceIfFallbackNeeded) {
@@ -461,10 +504,31 @@ public class PortfolioServiceImpl implements PortfolioService {
             BigDecimal purchasePrice,
             BigDecimal amount,
             PortfolioSummaryAggregators aggregators,
-            Map<String, BigDecimal> valueByType) {
+            Map<String, BigDecimal> valueByType,
+            Map<String, BigDecimal> valueByCurrency,
+            String preferredCurrency) {
 
         BigDecimal holdingCost = purchasePrice.multiply(amount);
         BigDecimal holdingValue = currentValue.multiply(amount);
+
+        // Convert amounts to preferred currency if required
+        String sourceCurrency = inv.getCurrency() != null ? inv.getCurrency().toUpperCase() : "UNK";
+        if (!sourceCurrency.equalsIgnoreCase(preferredCurrency)) {
+            BigDecimal convertedCost = currencyConversionService.convert(holdingCost, sourceCurrency, preferredCurrency);
+            BigDecimal convertedValue = currencyConversionService.convert(holdingValue, sourceCurrency, preferredCurrency);
+
+            if (convertedCost != null) {
+                holdingCost = convertedCost;
+            } else {
+                logger.error("Failed to convert holding cost for investment {} from {} to {} during summary.", inv.getId(), sourceCurrency, preferredCurrency);
+            }
+
+            if (convertedValue != null) {
+                holdingValue = convertedValue;
+            } else {
+                logger.error("Failed to convert holding value for investment {} from {} to {} during summary.", inv.getId(), sourceCurrency, preferredCurrency);
+            }
+        }
 
         // Set totalCost on the investment object
         inv.setTotalCost(holdingCost.setScale(2, RoundingMode.HALF_UP));
@@ -493,6 +557,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         }
 
         updatePerformanceTrackers(inv, individualPnlPercent, currentValue, holdingValue, aggregators);
+
+        // Accumulate by currency as well
+        valueByCurrency.put(sourceCurrency, valueByCurrency.getOrDefault(sourceCurrency, BigDecimal.ZERO).add(holdingValue));
 
         String type = inv.getType() != null ? inv.getType() : "Unknown";
         valueByType.put(type, valueByType.getOrDefault(type, BigDecimal.ZERO).add(holdingValue));
@@ -535,15 +602,26 @@ public class PortfolioServiceImpl implements PortfolioService {
         return BigDecimal.ZERO;
     }
 
-    private BigDecimal calculateRealizedPnl(List<Investment> soldInvestments) {
-        BigDecimal realizedPnlAbsolute = BigDecimal.ZERO;
+    private BigDecimal calculateRealizedPnlInPreferredCurrency(List<Investment> soldInvestments, String preferredCurrency) {
+        BigDecimal realizedPnlPreferred = BigDecimal.ZERO;
         for (Investment inv : soldInvestments) {
             if (inv.getSellPrice() != null && inv.getPurchasePrice() != null && inv.getAmount() != null) {
                 BigDecimal gainLossPerUnit = inv.getSellPrice().subtract(inv.getPurchasePrice());
-                realizedPnlAbsolute = realizedPnlAbsolute.add(gainLossPerUnit.multiply(inv.getAmount()));
+                BigDecimal pnlAbs = gainLossPerUnit.multiply(inv.getAmount());
+
+                String srcCurrency = inv.getCurrency() != null ? inv.getCurrency().toUpperCase() : preferredCurrency;
+                if (!srcCurrency.equalsIgnoreCase(preferredCurrency)) {
+                    BigDecimal converted = currencyConversionService.convert(pnlAbs, srcCurrency, preferredCurrency);
+                    if (converted != null) {
+                        pnlAbs = converted;
+                    } else {
+                        logger.warn("Failed to convert realized PnL from {} to {} for investment {}", srcCurrency, preferredCurrency, inv.getId());
+                    }
+                }
+                realizedPnlPreferred = realizedPnlPreferred.add(pnlAbs);
             }
         }
-        return realizedPnlAbsolute;
+        return realizedPnlPreferred;
     }
 
     private Map<String, BigDecimal> calculateAssetAllocation(Map<String, BigDecimal> valueByType, BigDecimal totalValue) {
@@ -582,6 +660,7 @@ public class PortfolioServiceImpl implements PortfolioService {
                 "All Portfolios (None Found)",
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 Collections.emptyMap(),
+                Collections.emptyMap(),
                 0, null, null
         );
         return new PortfolioSummaryResponse(metrics, Collections.emptyList(), Collections.emptyList());
@@ -610,9 +689,8 @@ public class PortfolioServiceImpl implements PortfolioService {
         logger.info("Finished update processing for user {}. Updated {} investments. Saved {} portfolios.",
                 user.getUsername(), updatedInvestmentsCount, portfoliosSavedCount);
 
-        if (portfoliosSavedCount > 0 || !userPortfolios.isEmpty()) {
-           recordUserTotalPortfolioValue(user);
-        }
+        // Always record the portfolio value history when refreshing values
+        recordUserTotalPortfolioValue(user);
     }
 
     private PortfolioUpdateResults processPortfolioInvestmentsUpdate(Portfolio portfolio, User user) {
@@ -641,7 +719,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         boolean portfolioSaved = false;
         if (anyIndividualInvestmentUpdated || portfolioTotalValueChanged) {
             try {
-                portfolioRepository.save(portfolio);
+                portfolioRepository.saveAndFlush(portfolio);
                 portfolioSaved = true;
                 logger.info("Portfolio {} (ID: {}) saved. anyIndividualInvestmentUpdated: {}, portfolioTotalValueChanged: {}", portfolio.getName(), portfolio.getId(), anyIndividualInvestmentUpdated, portfolioTotalValueChanged);
             } catch (Exception e) {
@@ -675,7 +753,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         }
         try {
             PriceInfo priceInfo = marketDataService.getCurrentValue(
-                    investment.getTicker(), investment.getType(), investment.getCurrency());
+                    investment.getTicker(), investment.getType(), investment.getCurrency(), true); // Force refresh
 
             if (priceInfo != null && priceInfo.value() != null) {
                 if (investment.getCurrentValue() == null || investment.getCurrentValue().compareTo(priceInfo.value()) != 0) {
@@ -732,6 +810,13 @@ public class PortfolioServiceImpl implements PortfolioService {
     }
 
     private void recordUserTotalPortfolioValue(User user) {
+        // Ensure any pending changes are flushed before we calculate totals
+        try {
+            entityManager.flush();
+        } catch (Exception e) {
+            logger.warn("EntityManager flush failed before recording portfolio value history for user {}: {}", user.getUsername(), e.getMessage());
+        }
+
         List<Portfolio> allUserPortfolios = portfolioRepository.findByUserId(user.getId());
         
         BigDecimal grandTotalValue = allUserPortfolios.stream()

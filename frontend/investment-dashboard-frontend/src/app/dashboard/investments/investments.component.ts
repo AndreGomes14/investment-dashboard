@@ -31,6 +31,8 @@ import { SellConfirmDialogComponent, SellConfirmDialogResult } from './dialog/se
 
 // Define the interface for aggregated data
 interface AggregatedInvestment {
+  portfolioId: number;
+  portfolioName: string;
   ticker: string;
   type: string;
   currency: string;
@@ -39,6 +41,17 @@ interface AggregatedInvestment {
   totalPurchaseCost: number;
   totalCurrentValue: number | null;
   percentProfit: number | null;
+  individualInvestments: Investment[];
+}
+
+interface AggregatedSoldInvestment {
+  ticker: string;
+  type: string;
+  currency: string;
+  totalAmount: number;
+  averagePurchasePrice: number;
+  averageSellPrice: number;
+  realizedPnlAbsolute: number;
   individualInvestments: Investment[];
 }
 
@@ -70,17 +83,19 @@ export class InvestmentsComponent implements OnInit {
   isLoadingInvestments: boolean = false;
   isUpdatingInvestmentValue: boolean = false;
   portfolios: Portfolio[] | null = null;
-  selectedPortfolioId: number | null = null;
+  selectedPortfolioId: number | 'all' | null = 'all';
   investmentsForSelectedPortfolio: Investment[] | null = null;
   soldInvestmentsForSelectedPortfolio: Investment[] | null = null;
   aggregatedInvestments: AggregatedInvestment[] | null = null;
+  aggregatedSoldInvestments: AggregatedSoldInvestment[] | null = null;
+  selectedTabIndex: number = 0;
 
   get hasAnyPortfolios(): boolean {
     return !!(this.portfolios && this.portfolios.length > 0);
   }
 
   get selectedPortfolioName(): string {
-    if (this.selectedPortfolioId === null) {
+    if (this.selectedPortfolioId === 'all') {
       return 'All Portfolios';
     }
     if (!this.portfolios) {
@@ -106,10 +121,11 @@ export class InvestmentsComponent implements OnInit {
     if (showLoading) {
       this.isLoading = true;
     }
-    this.selectedPortfolioId = null;
+    this.selectedPortfolioId = 'all';
     this.investmentsForSelectedPortfolio = null;
     this.soldInvestmentsForSelectedPortfolio = null;
     this.aggregatedInvestments = null;
+    this.aggregatedSoldInvestments = null;
     this.portfolioService.getUserPortfolios()
       .pipe(
         finalize(() => { if (showLoading) { this.isLoading = false; } })
@@ -120,7 +136,7 @@ export class InvestmentsComponent implements OnInit {
           this.loadDataForSelection();
         },
         error: (error) => {
-          this.selectedPortfolioId = null;
+          this.selectedPortfolioId = 'all';
           this.portfolios = [];
           this.loadDataForSelection();
         }
@@ -128,7 +144,7 @@ export class InvestmentsComponent implements OnInit {
   }
 
   onPortfolioSelected(): void {
-    console.log('Portfolio selected (null means All): ', this.selectedPortfolioId);
+    console.log('Portfolio selected ("all" means All): ', this.selectedPortfolioId);
     this.loadDataForSelection();
   }
 
@@ -137,9 +153,10 @@ export class InvestmentsComponent implements OnInit {
     this.investmentsForSelectedPortfolio = null;
     this.soldInvestmentsForSelectedPortfolio = null;
     this.aggregatedInvestments = null;
+    this.aggregatedSoldInvestments = null;
 
-    if (this.selectedPortfolioId !== null) {
-      this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId)
+    if (this.selectedPortfolioId !== 'all') {
+      this.investmentService.getInvestmentsByPortfolioId(this.selectedPortfolioId as number)
         .pipe(finalize(() => this.isLoadingInvestments = false))
         .subscribe(allInvestments => {
           this.processInvestments(allInvestments);
@@ -181,6 +198,7 @@ export class InvestmentsComponent implements OnInit {
       this.investmentsForSelectedPortfolio = [];
       this.soldInvestmentsForSelectedPortfolio = [];
       this.aggregatedInvestments = [];
+      this.aggregatedSoldInvestments = [];
       return;
     }
 
@@ -215,7 +233,7 @@ export class InvestmentsComponent implements OnInit {
     this.soldInvestmentsForSelectedPortfolio = soldInvestments;
 
     if (activeInvestments && activeInvestments.length > 0) {
-      const portfolioIdentifier = this.selectedPortfolioId ?? 'all';
+      const portfolioIdentifier = this.selectedPortfolioId;
       console.log(`Aggregating ${activeInvestments.length} ACTIVE investments for portfolio ${portfolioIdentifier}.`);
       this.aggregateInvestments(activeInvestments);
       console.log(`Aggregated into ${this.aggregatedInvestments?.length} positions.`);
@@ -224,6 +242,13 @@ export class InvestmentsComponent implements OnInit {
       this.aggregatedInvestments = [];
     }
     console.log(`Found ${soldInvestments.length} SOLD investments for the current selection.`);
+
+    // Aggregate sold
+    if (soldInvestments && soldInvestments.length > 0) {
+      this.aggregateSoldInvestments(soldInvestments);
+    } else {
+      this.aggregatedSoldInvestments = [];
+    }
   }
 
   createPortfolio() {
@@ -268,7 +293,7 @@ export class InvestmentsComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result && this.selectedPortfolioId && this.portfolios) {
         this.isUpdatingPortfolio = true;
-        this.portfolioService.updatePortfolio(this.selectedPortfolioId, result)
+        this.portfolioService.updatePortfolio(this.selectedPortfolioId as number, result)
           .pipe(finalize(() => this.isUpdatingPortfolio = false))
           .subscribe(updatedPortfolio => {
             if (updatedPortfolio) {
@@ -307,12 +332,12 @@ export class InvestmentsComponent implements OnInit {
       if (confirmed && this.selectedPortfolioId) {
         console.log(`Deletion confirmed for portfolio ID: ${this.selectedPortfolioId}`);
         this.isDeletingPortfolio = true;
-        this.portfolioService.deletePortfolio(this.selectedPortfolioId)
+        this.portfolioService.deletePortfolio(this.selectedPortfolioId as number)
           .pipe(finalize(() => this.isDeletingPortfolio = false))
           .subscribe(success => {
             if (success) {
               this.snackBar.open(`Portfolio '${portfolioName}' deleted successfully.`, 'Close', { duration: 3000 });
-              this.selectedPortfolioId = null;
+              this.selectedPortfolioId = 'all';
               this.checkPortfolios(false);
             }
           });
@@ -346,15 +371,25 @@ export class InvestmentsComponent implements OnInit {
       if (result && this.selectedPortfolioId) {
         console.log('Add Investment Dialog closed with data:', result);
 
-        const investmentData = {
-          ticker: result.ticker,
+        // Build the payload to send to backend
+        const investmentData: any = {
+          ticker: result.ticker, // For 'Other', this might be blank and will be filled by backend using name
           type: result.type,
           currency: result.currency,
           amount: result.amount,
           purchasePrice: result.purchasePrice
         };
 
-        this.investmentService.createInvestment(this.selectedPortfolioId, investmentData)
+        // When the investment type is 'Other', include the custom asset name (maps to `name` in backend DTO)
+        if (result.type === 'Other') {
+          investmentData.name = result.customName;
+          // If the user provided a current value for the custom asset, pass it along (backend may ignore if unsupported)
+          if (result.currentValue !== undefined && result.currentValue !== null) {
+            investmentData.currentValue = result.currentValue;
+          }
+        }
+
+        this.investmentService.createInvestment(this.selectedPortfolioId as number, investmentData)
           .subscribe(createdInvestment => {
             if (createdInvestment) {
               this.snackBar.open(`Investment '${createdInvestment.ticker}' added successfully!`, 'Close', { duration: 3000 });
@@ -370,8 +405,8 @@ export class InvestmentsComponent implements OnInit {
   }
 
   editInvestment(investment: Investment) {
-    if (!this.selectedPortfolioId || !investment || !investment.id) {
-      this.snackBar.open('Cannot edit investment: Invalid selection or investment data.', 'Close', { duration: 3000 });
+    if (!investment || !investment.id) {
+      this.snackBar.open('Cannot edit investment: Invalid investment data.', 'Close', { duration: 3000 });
       return;
     }
     console.log(`Edit Investment clicked for:`, investment);
@@ -402,8 +437,8 @@ export class InvestmentsComponent implements OnInit {
   }
 
   deleteInvestment(investment: Investment) {
-    if (!this.selectedPortfolioId || !investment || !investment.id) {
-      this.snackBar.open('Cannot delete investment: Invalid selection or investment data.', 'Close', { duration: 3000 });
+    if (!investment || !investment.id) {
+      this.snackBar.open('Cannot delete investment: Invalid investment data.', 'Close', { duration: 3000 });
       return;
     }
     console.log(`Delete Investment requested for:`, investment);
@@ -480,7 +515,7 @@ export class InvestmentsComponent implements OnInit {
   }
 
   exportData(): void {
-    if (!this.selectedPortfolioId) {
+    if (this.isAllSelected()) {
       this.snackBar.open('Please select a portfolio to export.', 'Close', { duration: 3000 });
       return;
     }
@@ -526,15 +561,23 @@ export class InvestmentsComponent implements OnInit {
 
   private aggregateInvestments(investments: Investment[]): void {
     const groups = new Map<string, AggregatedInvestment>();
+    const portfolioNameCache = new Map<number, string>();
 
     for (const investment of investments) {
       if (!investment.ticker) continue;
 
-      const key = (investment.ticker || '').trim().toUpperCase();
+      const pId: any = (investment.portfolioId ?? (investment.portfolio ? investment.portfolio.id : null));
+      const tickerKey = (investment.ticker || '').trim().toUpperCase();
+      const key = `${pId}-${tickerKey}`; // distinct per portfolio
+
       let group = groups.get(key);
 
       if (!group) {
+        const pName = this.getPortfolioNameById(pId, portfolioNameCache);
+
         group = {
+          portfolioId: pId,
+          portfolioName: pName,
           ticker: investment.ticker,
           type: investment.type || 'N/A',
           currency: investment.currency || 'N/A',
@@ -589,6 +632,59 @@ export class InvestmentsComponent implements OnInit {
     this.aggregatedInvestments.sort((a, b) => a.ticker.localeCompare(b.ticker));
   }
 
+  private aggregateSoldInvestments(investments: Investment[]): void {
+    const groups = new Map<string, AggregatedSoldInvestment>();
+
+    for (const inv of investments) {
+      if (!inv.ticker) continue;
+
+      const key = inv.ticker.trim().toUpperCase();
+      let group = groups.get(key);
+
+      if (!group) {
+        group = {
+          ticker: inv.ticker,
+          type: inv.type || 'N/A',
+          currency: inv.currency || 'N/A',
+          totalAmount: 0,
+          averagePurchasePrice: 0,
+          averageSellPrice: 0,
+          realizedPnlAbsolute: 0,
+          individualInvestments: []
+        };
+        groups.set(key, group);
+      }
+
+      const amount = inv.amount ?? 0;
+      group.totalAmount += amount;
+
+      // weighted averages
+      group.averagePurchasePrice += (inv.purchasePrice ?? 0) * amount;
+      if (inv.sellPrice !== null && inv.sellPrice !== undefined) {
+        group.averageSellPrice += inv.sellPrice * amount;
+      }
+
+      group.realizedPnlAbsolute += inv.realizedPnl ?? 0;
+      group.individualInvestments.push(inv);
+    }
+
+    // finalize averages
+    this.aggregatedSoldInvestments = Array.from(groups.values()).map(g => {
+      if (g.totalAmount > 0) {
+        g.averagePurchasePrice = g.averagePurchasePrice / g.totalAmount;
+        g.averageSellPrice = g.averageSellPrice / g.totalAmount;
+      }
+      return g;
+    });
+  }
+
+  getPortfolioNameById(id: any, cache?: Map<any, string>): string {
+    if (cache && cache.has(id)) return cache.get(id)!;
+    const name = this.portfolios?.find(p => String(p.id) === String(id))?.name || 'Unknown';
+    if (cache) cache.set(id, name);
+    return name;
+  }
+
   promptAndUpdateValue(investment: Investment): void {
     const newValueString = window.prompt(`Enter new current value for ${investment.ticker}:`, investment.currentValue?.toString() || '0');
     if (newValueString === null) {
@@ -621,5 +717,13 @@ export class InvestmentsComponent implements OnInit {
           this.snackBar.open(errorMessage, 'Close', { duration: 5000, panelClass: ['error-snackbar'] });
         }
       });
+  }
+
+  private isAllSelected(): boolean {
+    return this.selectedPortfolioId === 'all';
+  }
+
+  onTabChange(event: any): void {
+    this.selectedTabIndex = event.index;
   }
 }
