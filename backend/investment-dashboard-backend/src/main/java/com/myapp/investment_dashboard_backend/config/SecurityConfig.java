@@ -32,24 +32,47 @@ public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AuthorizationConfig authorizationConfig;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Allow both exact /api/auth/** and /auth/** paths for flexibility
-                        .requestMatchers("/api/auth/**", "/auth/**").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll() // Only for development
-                        .anyRequest().authenticated()
-                );
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        // Add JWT filter before UsernamePasswordAuthenticationFilter
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // Configure authorization based on authorizationConfig.enable
+        if (authorizationConfig.isEnable()) {
+            // Apply role-based authorization
+            http.authorizeHttpRequests(auth -> {
+                // Apply URL-to-role mappings from config file FIRST
+                authorizationConfig.getUrlToRoleList().forEach(mapping -> {
+                    try {
+                        auth.requestMatchers(mapping.getUrl()).hasAnyRole(mapping.getRoles().toArray(new String[0]));
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to configure security for URL: " + mapping.getUrl(), e);
+                    }
+                });
+
+                // THEN, configure public endpoints
+                auth.requestMatchers("/api/auth/**", "/auth/**").permitAll();
+                auth.requestMatchers("/public/**").permitAll();
+                auth.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**").permitAll();
+
+                // FINALLY, the catch-all for any other request
+                auth.anyRequest().authenticated();
+            });
+        } else {
+            // Development mode - allow all authenticated requests
+            http.authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/api/auth/**", "/auth/**").permitAll()
+                    .requestMatchers("/api/public/**").permitAll()
+                    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                    .requestMatchers("/h2-console/**").permitAll() // Only for development
+                    .anyRequest().authenticated()
+            );
+        }
 
         return http.build();
     }
@@ -80,7 +103,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
         configuration.setExposedHeaders(Collections.singletonList("Authorization"));
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L); // 1 hour cache for preflight requests
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

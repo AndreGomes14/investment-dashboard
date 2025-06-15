@@ -1,5 +1,6 @@
 package com.myapp.investment_dashboard_backend.dto.portfolio;
 
+import com.myapp.investment_dashboard_backend.dto.investment.InvestmentPerformanceDTO;
 import com.myapp.investment_dashboard_backend.model.Investment;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,9 +29,10 @@ public class PortfolioSummaryResponse {
         private BigDecimal unrealizedPnlPercentage;
         private BigDecimal realizedPnlAbsolute;
         private Map<String, BigDecimal> assetAllocationByValue;
+        private Map<String, BigDecimal> currencyAllocationByValue;
 
         private int activeInvestmentsCount;
-        private com.myapp.investment_dashboard_backend.dto.portfolio.InvestmentPerformanceDTO bestPerformer;
-        private com.myapp.investment_dashboard_backend.dto.portfolio.InvestmentPerformanceDTO worstPerformer;
+        private InvestmentPerformanceDTO bestPerformer;
+        private InvestmentPerformanceDTO worstPerformer;
     }
 }

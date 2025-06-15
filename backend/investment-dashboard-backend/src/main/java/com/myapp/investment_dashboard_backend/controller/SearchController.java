@@ -1,7 +1,7 @@
 package com.myapp.investment_dashboard_backend.controller;
 
 import com.myapp.investment_dashboard_backend.dto.investment.InstrumentSearchResult;
-import com.myapp.investment_dashboard_backend.service.MarketDataService;
+import com.myapp.investment_dashboard_backend.service.impl.MarketDataServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,10 +15,10 @@ import java.util.List;
 @RequestMapping("/api/search")
 public class SearchController {
 
-    private final MarketDataService marketDataService;
+    private final MarketDataServiceImpl marketDataService;
 
     @Autowired
-    public SearchController(MarketDataService marketDataService) {
+    public SearchController(MarketDataServiceImpl marketDataService) {
         this.marketDataService = marketDataService;
     }
 

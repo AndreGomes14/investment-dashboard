@@ -10,10 +10,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -41,12 +44,15 @@ public class JwtTokenProvider {
         this.secretKey = Keys.hmacShaKeyFor(encodedSecret.getBytes());
     }
 
-    public String generateToken(String username) {
+    public String generateToken(Authentication authentication) {
+        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .setSubject(username)
+                .setSubject(userPrincipal.getUsername())
+                .claim("roles", userPrincipal.getAuthorities().stream().map(Object::toString).toList())
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(secretKey)
@@ -80,8 +86,22 @@ public class JwtTokenProvider {
     }
 
     public Authentication getAuthentication(String token) {
-        UserDetails userDetails = userDetailsService.loadUserByUsername(getUsernameFromToken(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        String username = claims.getSubject();
+        
+        // Correctly parse the roles claim
+        List<String> roles = claims.get("roles", List.class);
+        List<SimpleGrantedAuthority> authorities = roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
+
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(username, "", authorities);
+        return new UsernamePasswordAuthenticationToken(userDetails, "", authorities);
     }
 
     public long getExpirationTime() {

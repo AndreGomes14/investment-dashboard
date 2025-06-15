@@ -33,6 +33,9 @@ public class Investment {
     @Column(nullable = false, length = 30)
     private String type;
 
+    @Column(name = "custom_name", length = 100)
+    private String customName;
+
     @Column(precision = 19, scale = 4)
     private BigDecimal amount;
 
@@ -61,4 +64,13 @@ public class Investment {
 
     @Column(name = "sell_price", precision = 19, scale = 4)
     private BigDecimal sellPrice;
+
+    @Transient
+    private BigDecimal profitOrLoss;
+
+    @Transient
+    private BigDecimal percentProfit;
+
+    @Transient
+    private BigDecimal totalCost;
 }

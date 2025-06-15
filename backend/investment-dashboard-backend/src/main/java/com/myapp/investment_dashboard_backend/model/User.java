@@ -19,8 +19,8 @@ import java.util.UUID;
 @Table(name = "users")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(exclude = {"settings", "portfolios"})
-@ToString(exclude = {"settings", "portfolios"})
+@EqualsAndHashCode(exclude = {"settings", "portfolios", "roles"})
+@ToString(exclude = {"settings", "portfolios", "roles"})
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -50,4 +50,12 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonBackReference
     private Set<Portfolio> portfolios = new HashSet<>();
+
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
 }

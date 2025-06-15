@@ -21,4 +21,7 @@ public class UpdateInvestmentRequest {
 
     @DecimalMin(value = "0.0001", message = "Purchase price must be greater than zero")
     private BigDecimal purchasePrice;
+
+    @DecimalMin(value = "0", message = "Current value cannot be negative")
+    private BigDecimal currentValue;
 }

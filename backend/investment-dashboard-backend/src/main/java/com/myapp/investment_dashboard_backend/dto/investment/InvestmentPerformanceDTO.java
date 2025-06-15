@@ -1,4 +1,4 @@
-package com.myapp.investment_dashboard_backend.dto.portfolio;
+package com.myapp.investment_dashboard_backend.dto.investment;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

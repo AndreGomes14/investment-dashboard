@@ -4,7 +4,7 @@ import com.myapp.investment_dashboard_backend.dto.api.ApiResponse;
 import com.myapp.investment_dashboard_backend.dto.auth.AuthResponse;
 import com.myapp.investment_dashboard_backend.dto.auth.LoginRequest;
 import com.myapp.investment_dashboard_backend.dto.auth.RegisterRequest;
-import com.myapp.investment_dashboard_backend.service.AuthService;
+import com.myapp.investment_dashboard_backend.service.impl.AuthServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
+    private final AuthServiceImpl authService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {

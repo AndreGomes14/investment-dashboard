@@ -2,8 +2,9 @@ package com.myapp.investment_dashboard_backend.controller;
 
 import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentRequest;
 import com.myapp.investment_dashboard_backend.dto.investment.SellInvestmentRequest;
+import com.myapp.investment_dashboard_backend.dto.investment.UpdateInvestmentValueRequest;
 import com.myapp.investment_dashboard_backend.model.Investment;
-import com.myapp.investment_dashboard_backend.service.InvestmentService;
+import com.myapp.investment_dashboard_backend.service.impl.InvestmentServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,10 +18,10 @@ import java.util.UUID;
 @RequestMapping("/api/investments")
 public class InvestmentController {
 
-    private final InvestmentService investmentService;
+    private final InvestmentServiceImpl investmentService;
 
     @Autowired
-    public InvestmentController(InvestmentService investmentService) {
+    public InvestmentController(InvestmentServiceImpl investmentService) {
         this.investmentService = investmentService;
     }
 
@@ -99,5 +100,14 @@ public class InvestmentController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    // New endpoint to manually update current value for an investment
+    @PutMapping("/{id}/current-value")
+    public ResponseEntity<Investment> manuallyUpdateInvestmentCurrentValue(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateInvestmentValueRequest request) {
+        Investment updatedInvestment = investmentService.manuallyUpdateInvestmentCurrentValue(id, request.getCurrentValue());
+        return ResponseEntity.ok(updatedInvestment);
     }
 }
