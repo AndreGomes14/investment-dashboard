@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  min-width: 800px;
+}
+
+.table-responsive {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.holdings-table th,
+.holdings-table td {
+  padding: 8px 12px;
+  text-align: right;
+}
+
+.holdings-table th:first-child,
+.holdings-table td:first-child {
+  text-align: left;
+}
+
+.positive {
+  color: #2e7d32; /* green */
+}
+
+.negative {
+  color: #c62828; /* red */
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.holdings-table tbody tr:nth-child(odd) {
+  background-color: #f5f5f5;
+}
+
+.holdings-table th mat-icon {
+  vertical-align: middle;
+  font-size: 16px;
+  margin-left: 4px;
+} 

@@ -115,6 +115,18 @@
                         <span class="value unavailable" *ngIf="aggInvestment.percentProfit === null">N/A</span>
                       </div>
                     </div>
+                    <!-- Action buttons -->
+                    <div class="header-actions" style="display:flex; gap:6px;">
+                      <button mat-icon-button (click)="editInvestment(aggInvestment.individualInvestments[0])" matTooltip="Edit">
+                        <mat-icon>edit_note</mat-icon>
+                      </button>
+                      <button mat-icon-button color="primary" (click)="sellInvestment(aggInvestment.individualInvestments[0])" matTooltip="Sell">
+                        <mat-icon>sell</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteInvestment(aggInvestment.individualInvestments[0])" matTooltip="Delete">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
                   </mat-panel-title>
                 </mat-expansion-panel-header>
 
@@ -251,6 +263,18 @@
                         {{ agg.realizedPnlAbsolute | currency:agg.currency:'symbol':'1.2-2' }}
                       </span>
                     </div>
+                  </div>
+                  <!-- Action buttons -->
+                  <div class="header-actions" style="display:flex; gap:6px;">
+                    <button mat-icon-button (click)="editInvestment(agg.individualInvestments[0])" matTooltip="Edit">
+                      <mat-icon>edit_note</mat-icon>
+                    </button>
+                    <button mat-icon-button color="primary" (click)="sellInvestment(agg.individualInvestments[0])" matTooltip="Sell">
+                      <mat-icon>sell</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteInvestment(agg.individualInvestments[0])" matTooltip="Delete">
+                      <mat-icon>delete</mat-icon>
+                    </button>
                   </div>
                 </mat-panel-title>
               </mat-expansion-panel-header>

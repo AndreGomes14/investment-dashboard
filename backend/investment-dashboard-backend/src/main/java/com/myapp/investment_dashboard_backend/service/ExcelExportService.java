@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface ExcelExportService {
     byte[] createInvestmentExcel(List<Investment> investments) throws IOException;
+
+    byte[] createInvestmentExcelWithPortfolio(List<Investment> investments) throws IOException;
 } 

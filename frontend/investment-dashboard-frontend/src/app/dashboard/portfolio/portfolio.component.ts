@@ -11,10 +11,15 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { Observable, switchMap, of, tap, map, BehaviorSubject, combineLatest, startWith, catchError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
+import { FormsModule } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 
 import { PortfolioService, PortfolioSummaryResponse, PortfolioSummaryMetrics, InvestmentPerformance, HistoricalDataPoint } from '../../services/portfolio.service';
+import { Investment } from '../../model/investment.model';
 import { AllocationDetailsDialogComponent } from './allocation-details-dialog.component';
 import { PreferenceService } from '../../services/preference.service';
+import { CompanyNameService } from '../../services/company-name.service';
 
 interface ChartDataPoint {
   name: string;
@@ -44,7 +49,10 @@ export interface LineChartSeries {
     MatButtonToggleModule,
     MatDialogModule,
     RouterLink,
-    NgxChartsModule
+    NgxChartsModule,
+    FormsModule,
+    MatFormFieldModule,
+    MatInputModule
   ],
   providers: [DatePipe],
   templateUrl: './portfolio.component.html',
@@ -105,13 +113,30 @@ export class PortfolioComponent implements OnInit {
   portfolioId: number | null = null;
   private refreshTrigger$ = new BehaviorSubject<void>(undefined);
 
+  // Sorting state for active holdings
+  sortColumn: 'asset' | 'type' | 'value' | 'units' | 'purchasePrice' | 'totalCost' | 'currentPrice' | 'profit' | 'percentProfit' = 'value';
+  sortDirection: 'asc' | 'desc' = 'desc';
+
+  assetFilter: string = '';
+  showAssetSearch: boolean = false;
+
+  tickerNames: Record<string, string> = {};
+
+  // Sorting state for sold holdings
+  soldSortColumn: 'asset' | 'type' | 'units' | 'purchasePrice' | 'sellPrice' | 'realizedPnl' | 'percentProfit' | 'dateSold' = 'dateSold';
+  soldSortDirection: 'asc' | 'desc' = 'desc';
+
+  soldAssetFilter: string = '';
+  showSoldAssetSearch: boolean = false;
+
   constructor(
     private readonly portfolioService: PortfolioService,
     private readonly snackBar: MatSnackBar,
     private readonly route: ActivatedRoute,
     private readonly datePipe: DatePipe,
     private readonly dialog: MatDialog,
-    private readonly prefSvc: PreferenceService
+    private readonly prefSvc: PreferenceService,
+    private readonly companyNameSvc: CompanyNameService
   ) {}
 
   ngOnInit(): void {
@@ -256,6 +281,15 @@ export class PortfolioComponent implements OnInit {
     this.prefSvc.currencyChanges.subscribe(cur => {
       this.preferredCurrency = cur;
       this.refreshTrigger$.next();
+    });
+
+    this.summaryData$.subscribe(sd => {
+      const tickers = sd?.activeInvestments?.map(i => i.ticker.toUpperCase()) || [];
+      tickers.forEach(ticker => {
+        if (!this.tickerNames[ticker]) {
+          this.companyNameSvc.getName(ticker).subscribe(name => this.tickerNames[ticker] = name);
+        }
+      });
     });
   }
 
@@ -422,5 +456,140 @@ export class PortfolioComponent implements OnInit {
         allocation: currentSummary.currencyAllocationByValue
       }
     });
+  }
+
+  sortBy(column: 'asset' | 'type' | 'value' | 'units' | 'purchasePrice' | 'totalCost' | 'currentPrice' | 'profit' | 'percentProfit'): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      // default asc for asset/type, desc for value
+      this.sortDirection = column === 'value' ? 'desc' : 'asc';
+    }
+  }
+
+  getSortedActiveInvestments(list: Investment[] | undefined): Investment[] {
+    if (!list) return [];
+    let filtered = [...list];
+    if (this.assetFilter.trim().length > 0) {
+      const lower = this.assetFilter.toLowerCase();
+      filtered = filtered.filter(inv => {
+        const name = inv.type === 'Other' ? (inv.customName ?? '') : inv.ticker;
+        return name.toLowerCase().includes(lower);
+      });
+    }
+    const sorted = filtered;
+    sorted.sort((a, b) => {
+      let compare = 0;
+      switch (this.sortColumn) {
+        case 'asset':
+          const aName = a.type === 'Other' ? (a.customName ?? '') : a.ticker;
+          const bName = b.type === 'Other' ? (b.customName ?? '') : b.ticker;
+          compare = aName.localeCompare(bName);
+          break;
+        case 'type':
+          compare = a.type.localeCompare(b.type);
+          break;
+        case 'value':
+          const aVal = (a.currentValue ?? 0) * (a.amount ?? 0);
+          const bVal = (b.currentValue ?? 0) * (b.amount ?? 0);
+          compare = aVal - bVal;
+          break;
+        case 'units':
+          compare = (a.amount ?? 0) - (b.amount ?? 0);
+          break;
+        case 'purchasePrice':
+          compare = (a.purchasePrice ?? 0) - (b.purchasePrice ?? 0);
+          break;
+        case 'totalCost':
+          compare = (a.totalCost ?? (a.purchasePrice * a.amount)) - (b.totalCost ?? (b.purchasePrice * b.amount));
+          break;
+        case 'currentPrice':
+          compare = (a.currentValue ?? 0) - (b.currentValue ?? 0);
+          break;
+        case 'profit':
+          compare = (a.profitOrLoss ?? 0) - (b.profitOrLoss ?? 0);
+          break;
+        case 'percentProfit':
+          compare = (a.percentProfit ?? 0) - (b.percentProfit ?? 0);
+          break;
+      }
+      return this.sortDirection === 'asc' ? compare : -compare;
+    });
+    return sorted;
+  }
+
+  toggleAssetSearch(): void {
+    this.showAssetSearch = !this.showAssetSearch;
+    if (!this.showAssetSearch) {
+      this.assetFilter = '';
+    }
+  }
+
+  soldSortBy(column: 'asset' | 'type' | 'units' | 'purchasePrice' | 'sellPrice' | 'realizedPnl' | 'percentProfit' | 'dateSold'): void {
+    if (this.soldSortColumn === column) {
+      this.soldSortDirection = this.soldSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.soldSortColumn = column;
+      // default desc for dateSold, asc for others
+      this.soldSortDirection = column === 'dateSold' ? 'desc' : 'asc';
+    }
+  }
+
+  getSortedSoldInvestments(list: Investment[] | undefined): Investment[] {
+    if (!list) return [];
+    let filtered = [...list];
+
+    // Text filter for asset/ticker
+    if (this.soldAssetFilter.trim().length > 0) {
+      const lower = this.soldAssetFilter.toLowerCase();
+      filtered = filtered.filter(inv => (inv.ticker || '').toLowerCase().includes(lower));
+    }
+
+    filtered.sort((a, b) => {
+      let compare = 0;
+      switch (this.soldSortColumn) {
+        case 'asset':
+          compare = a.ticker.localeCompare(b.ticker);
+          break;
+        case 'type':
+          compare = a.type.localeCompare(b.type);
+          break;
+        case 'units':
+          compare = (a.amount ?? 0) - (b.amount ?? 0);
+          break;
+        case 'purchasePrice':
+          compare = (a.purchasePrice ?? 0) - (b.purchasePrice ?? 0);
+          break;
+        case 'sellPrice':
+          compare = (a.sellPrice ?? 0) - (b.sellPrice ?? 0);
+          break;
+        case 'realizedPnl':
+          const aPnl = ((a.sellPrice ?? 0) - (a.purchasePrice ?? 0)) * (a.amount ?? 0);
+          const bPnl = ((b.sellPrice ?? 0) - (b.purchasePrice ?? 0)) * (b.amount ?? 0);
+          compare = aPnl - bPnl;
+          break;
+        case 'percentProfit':
+          const aPercent = (a.purchasePrice ? (((a.sellPrice ?? 0) - a.purchasePrice) / a.purchasePrice) : 0);
+          const bPercent = (b.purchasePrice ? (((b.sellPrice ?? 0) - b.purchasePrice) / b.purchasePrice) : 0);
+          compare = aPercent - bPercent;
+          break;
+        case 'dateSold':
+          const aDate = a.lastUpdateDate ? new Date(a.lastUpdateDate).getTime() : 0;
+          const bDate = b.lastUpdateDate ? new Date(b.lastUpdateDate).getTime() : 0;
+          compare = aDate - bDate;
+          break;
+      }
+      return this.soldSortDirection === 'asc' ? compare : -compare;
+    });
+
+    return filtered;
+  }
+
+  toggleSoldAssetSearch(): void {
+    this.showSoldAssetSearch = !this.showSoldAssetSearch;
+    if (!this.showSoldAssetSearch) {
+      this.soldAssetFilter = '';
+    }
   }
 }

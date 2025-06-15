@@ -28,6 +28,7 @@ public class ExcelExportServiceImpl implements ExcelExportService {
 
     private static final Logger logger = LoggerFactory.getLogger(ExcelExportServiceImpl.class);
     private static final String[] HEADERS = {"Ticker", "Type", "Currency", "Units", "Purchase Price", "Current Value", "Status", "Purchase Date", "Last Price Update"};
+    private static final String[] HEADERS_WITH_PORTFOLIO = {"Portfolio", "Ticker", "Type", "Currency", "Units", "Purchase Price", "Current Value", "Status", "Purchase Date", "Last Price Update"};
 
     @Override
     public byte[] createInvestmentExcel(List<Investment> investments) throws IOException {
@@ -49,6 +50,55 @@ public class ExcelExportServiceImpl implements ExcelExportService {
 
             workbook.write(out);
             logger.info("Successfully generated Excel file for {} investments.", investments.size());
+            return out.toByteArray();
+
+        } catch (IOException e) {
+            logger.error("Error generating Excel file for investments: {}", e.getMessage(), e);
+            throw new IOException("Error generating Excel file for investments", e);
+        }
+    }
+
+    @Override
+    public byte[] createInvestmentExcelWithPortfolio(List<Investment> investments) throws IOException {
+        if (investments == null || investments.isEmpty()) {
+            logger.warn("No investments provided for Excel export.");
+            return createEmptyWorkbookBytes();
+        }
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Investments");
+
+            // Create custom header row with portfolio column
+            Row headerRow = sheet.createRow(0);
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            for (int i = 0; i < HEADERS_WITH_PORTFOLIO.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(HEADERS_WITH_PORTFOLIO[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Data rows
+            int rowIdx = 1;
+            DataCellStyles styles = new DataCellStyles(workbook);
+            for (Investment inv : investments) {
+                Row row = sheet.createRow(rowIdx++);
+                String pName = (inv.getPortfolio() != null) ? inv.getPortfolio().getName() : "N/A";
+                createStringCell(row,0,pName);
+                populateRowWithOffset(inv,row,styles,1);
+            }
+
+            for (int i = 0; i < HEADERS_WITH_PORTFOLIO.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            logger.info("Successfully generated Excel file (with portfolio) for {} investments.", investments.size());
             return out.toByteArray();
 
         } catch (IOException e) {
@@ -89,24 +139,24 @@ public class ExcelExportServiceImpl implements ExcelExportService {
 
         for (Investment investment : investments) {
             Row row = sheet.createRow(rowIdx++);
-            populateInvestmentRow(investment, row, cellStyles); // Pass cellStyles
+            populateRowWithOffset(investment, row, cellStyles, 1);
         }
     }
 
-    private void populateInvestmentRow(Investment investment, Row row, DataCellStyles cellStyles) {
-        createStringCell(row, 0, investment.getTicker());
-        createStringCell(row, 1, investment.getType());
-        createStringCell(row, 2, investment.getCurrency());
+    private void populateRowWithOffset(Investment investment, Row row, DataCellStyles styles, int colOffset) {
+        createStringCell(row, colOffset, investment.getTicker());
+        createStringCell(row, 1 + colOffset, investment.getType());
+        createStringCell(row, 2 + colOffset, investment.getCurrency());
 
-        createBigDecimalCell(row, 3, investment.getAmount(), cellStyles.numberCellStyle);
-        createBigDecimalCell(row, 4, investment.getPurchasePrice(), cellStyles.currencyCellStyle);
-        createBigDecimalCellWithFallback(row, 5, investment.getCurrentValue(), cellStyles.currencyCellStyle);
+        createBigDecimalCell(row, 3 + colOffset, investment.getAmount(), styles.numberCellStyle);
+        createBigDecimalCell(row, 4 + colOffset, investment.getPurchasePrice(), styles.currencyCellStyle);
+        createBigDecimalCellWithFallback(row, 5 + colOffset, investment.getCurrentValue(), styles.currencyCellStyle);
 
         String statusString = (investment.getStatus() != null) ? investment.getStatus() : "N/A";
-        createStringCell(row, 6, statusString);
+        createStringCell(row, 6 + colOffset, statusString);
 
-        createLocalDateTimeCellWithFallback(row, 7, investment.getCreatedAt(), cellStyles.dateCellStyle);
-        createLocalDateTimeCellWithFallback(row, 8, investment.getLastUpdateDate(), cellStyles.dateCellStyle);
+        createLocalDateTimeCellWithFallback(row, 7 + colOffset, investment.getCreatedAt(), styles.dateCellStyle);
+        createLocalDateTimeCellWithFallback(row, 8 + colOffset, investment.getLastUpdateDate(), styles.dateCellStyle);
     }
 
     private void createStringCell(Row row, int columnIndex, String text) {

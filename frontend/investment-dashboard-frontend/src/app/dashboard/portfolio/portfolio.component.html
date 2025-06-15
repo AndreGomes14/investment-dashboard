@@ -152,15 +152,12 @@
     </div>
 
     <!-- Historical Value Chart Section -->
-    <mat-card class="historical-chart-card" 
-              *ngIf="!portfolioId" 
-              [class.fullscreen-chart-card]="isHistoryChartFullscreen">
-      <mat-card-header>
-        <mat-card-title>Overall Portfolio Value History</mat-card-title>
-        <button mat-icon-button (click)="toggleHistoryChartFullscreen()" class="fullscreen-button">
+    <div class="chart-section" *ngIf="!portfolioId">
+      <h2 class="section-title">Overall Portfolio Value History</h2>
+      <mat-card class="historical-chart-card" [class.fullscreen-chart-card]="isHistoryChartFullscreen">
+        <button mat-icon-button (click)="toggleHistoryChartFullscreen()" class="fullscreen-button" aria-label="Toggle fullscreen for history chart">
           <mat-icon>{{ isHistoryChartFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
         </button>
-      </mat-card-header>
       <mat-card-content [class.fullscreen-chart-content]="isHistoryChartFullscreen">
         <div class="time-range-selector" style="margin-bottom: 16px;" *ngIf="!isHistoryChartFullscreen">
           <mat-button-toggle-group #group="matButtonToggleGroup" (valueChange)="setTimeRange($event)" [value]="selectedTimeRange$ | async">
@@ -206,10 +203,12 @@
         </ng-container>
       </mat-card-content>
     </mat-card>
+    </div>
 
     <div class="holdings-section" *ngIf="summaryData.activeInvestments && summaryData.activeInvestments.length > 0">
       <div class="section-header">
         <h2>Active Holdings ({{ summaryData.summary.activeInvestmentsCount }})</h2>
+        <span class="spacer"></span>
         <button mat-raised-button color="primary" routerLink="../investments">
           <mat-icon>settings</mat-icon> Manage Investments
         </button>
@@ -219,19 +218,65 @@
           <table class="holdings-table">
             <thead>
             <tr>
-              <th>Asset (Ticker)</th>
-              <th>Type</th>
-              <th>Units</th>
-              <th>Purchase Price</th>
-              <th>Total Cost</th>
-              <th>Current Price</th>
-              <th>Total Value</th>
-              <th>Profit/Loss</th>
-              <th>Profit %</th>
+              <th class="asset-header">
+                <span class="sortable" (click)="sortBy('asset')">
+                  Asset (Ticker)
+                  <mat-icon *ngIf="sortColumn==='asset'">
+                    {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                  </mat-icon>
+                </span>
+                <button mat-icon-button color="primary" (click)="toggleAssetSearch(); $event.stopPropagation();" aria-label="Filter assets">
+                  <mat-icon>{{ showAssetSearch ? 'close' : 'search' }}</mat-icon>
+                </button>
+                <input *ngIf="showAssetSearch" type="text" [(ngModel)]="assetFilter" placeholder="Search..." class="asset-search-inline" (click)="$event.stopPropagation()" />
+              </th>
+              <th (click)="sortBy('type')" class="sortable">Type
+                <mat-icon *ngIf="sortColumn==='type'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('units')" class="sortable">Units
+                <mat-icon *ngIf="sortColumn==='units'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('purchasePrice')" class="sortable">Purchase Price
+                <mat-icon *ngIf="sortColumn==='purchasePrice'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('totalCost')" class="sortable">Total Cost
+                <mat-icon *ngIf="sortColumn==='totalCost'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('currentPrice')" class="sortable">Current Price
+                <mat-icon *ngIf="sortColumn==='currentPrice'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('value')" class="sortable">Total Value
+                <mat-icon *ngIf="sortColumn==='value'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('profit')" class="sortable">Profit/Loss
+                <mat-icon *ngIf="sortColumn==='profit'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="sortBy('percentProfit')" class="sortable">Profit %
+                <mat-icon *ngIf="sortColumn==='percentProfit'">
+                  {{ sortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
             </tr>
             </thead>
-            <tbody>
-            <tr *ngFor="let investment of summaryData.activeInvestments">
+            <tbody *ngIf="getSortedActiveInvestments(summaryData.activeInvestments) as holdings">
+            <tr *ngIf="holdings.length === 0">
+              <td colspan="9" style="text-align:center; padding:16px;">No investments match your search.</td>
+            </tr>
+            <tr *ngFor="let investment of holdings">
               <td>
                 <ng-container *ngIf="investment.type === 'Other'">
                   {{ investment.customName || 'Unnamed Custom Asset' }} (Other)
@@ -280,19 +325,68 @@
           <table class="holdings-table">
             <thead>
             <tr>
-              <th>Asset (Ticker)</th>
-              <th>Type</th>
-              <th>Units</th>
-              <th>Purchase Price</th>
-              <th>Sell Price</th>
-              <th>Date Sold</th>
-              <th>Realized PnL</th>
-              <th>Profit %</th>
+              <th class="asset-header">
+                <span class="sortable" (click)="soldSortBy('asset')">
+                  Asset (Ticker)
+                  <mat-icon *ngIf="soldSortColumn==='asset'">
+                    {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                  </mat-icon>
+                </span>
+                <button mat-icon-button color="primary" (click)="toggleSoldAssetSearch(); $event.stopPropagation();" aria-label="Filter assets">
+                  <mat-icon>{{ showSoldAssetSearch ? 'close' : 'search' }}</mat-icon>
+                </button>
+                <input *ngIf="showSoldAssetSearch" type="text" [(ngModel)]="soldAssetFilter" placeholder="Search..." class="asset-search-inline" (click)="$event.stopPropagation()" />
+              </th>
+              <th (click)="soldSortBy('type')" class="sortable">Type
+                <mat-icon *ngIf="soldSortColumn==='type'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('units')" class="sortable">Units
+                <mat-icon *ngIf="soldSortColumn==='units'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('purchasePrice')" class="sortable">Purchase Price
+                <mat-icon *ngIf="soldSortColumn==='purchasePrice'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('sellPrice')" class="sortable">Sell Price
+                <mat-icon *ngIf="soldSortColumn==='sellPrice'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('dateSold')" class="sortable">Date Sold
+                <mat-icon *ngIf="soldSortColumn==='dateSold'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('realizedPnl')" class="sortable">Realized PnL
+                <mat-icon *ngIf="soldSortColumn==='realizedPnl'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
+              <th (click)="soldSortBy('percentProfit')" class="sortable">Profit %
+                <mat-icon *ngIf="soldSortColumn==='percentProfit'">
+                  {{ soldSortDirection==='asc' ? 'arrow_upward' : 'arrow_downward' }}
+                </mat-icon>
+              </th>
             </tr>
             </thead>
-            <tbody>
-            <tr *ngFor="let investment of summaryData.soldInvestments">
-              <td>{{ investment.ticker }}</td>
+            <tbody *ngIf="getSortedSoldInvestments(summaryData.soldInvestments) as soldHoldings">
+            <tr *ngIf="soldHoldings.length === 0">
+              <td colspan="8" style="text-align:center; padding:16px;">No sold investments match your search.</td>
+            </tr>
+            <tr *ngFor="let investment of soldHoldings">
+              <td>
+                <ng-container *ngIf="investment.type === 'Other'">
+                  {{ investment.customName || 'Unnamed Custom Asset' }} (Other)
+                </ng-container>
+                <ng-container *ngIf="investment.type !== 'Other'">
+                  {{ investment.ticker }}
+                </ng-container>
+              </td>
               <td>{{ investment.type }}</td>
               <td>{{ investment.amount | number:'1.0-4' }}</td>
               <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
@@ -301,18 +395,18 @@
               <td>
                    <span class="profit-value"
                          *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null"
-                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
-                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
-                       {{ ((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) * (investment.amount ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}
+                         [class.positive]="((investment.sellPrice || 0) - (investment.purchasePrice || 0)) > 0"
+                         [class.negative]="((investment.sellPrice || 0) - (investment.purchasePrice || 0)) < 0">
+                       {{ ((investment.sellPrice || 0) - (investment.purchasePrice || 0)) * (investment.amount || 0) | currency:investment.currency:'symbol':'1.2-2' }}
                    </span>
                 <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null">N/A</span>
               </td>
               <td>
                    <span class="profit-value"
                          *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null && investment.purchasePrice !== 0"
-                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
-                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
-                       {{ (((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) / (investment.purchasePrice ?? 1)) | percent:'1.2-2' }}
+                         [class.positive]="((investment.sellPrice || 0) - (investment.purchasePrice || 0)) > 0"
+                         [class.negative]="((investment.sellPrice || 0) - (investment.purchasePrice || 0)) < 0">
+                        {{ (((investment.sellPrice || 0) - (investment.purchasePrice || 0)) / (investment.purchasePrice || 1)) | percent:'1.2-2' }}
                    </span>
                 <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null || investment.purchasePrice === 0">N/A</span>
               </td>

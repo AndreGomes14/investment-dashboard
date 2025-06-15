@@ -219,6 +219,35 @@ public class PortfolioController {
     }
 
     /**
+     * Exports all investments across all portfolios of current user into one Excel file with Portfolio column.
+     */
+    @GetMapping("/investments/export-all")
+    public ResponseEntity<byte[]> exportAllInvestmentsToExcel() {
+        try {
+            List<Portfolio> portfolios = portfolioService.getPortfoliosByCurrentUser();
+            List<Investment> all = new java.util.ArrayList<>();
+            for (Portfolio p : portfolios) {
+                List<Investment> invs = investmentService.getInvestmentsByPortfolioId(p.getId());
+                // ensure portfolio ref present for Excel
+                for (Investment inv : invs) {
+                    inv.setPortfolio(p);
+                }
+                all.addAll(invs);
+            }
+            byte[] excel = excelExportService.createInvestmentExcelWithPortfolio(all);
+
+            String filename = "investments_all.xlsx";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData(filename, filename);
+
+            return new ResponseEntity<>(excel, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Retrieves summary data for all portfolios of the current user.
      *
      * @return ResponseEntity containing the overall PortfolioSummaryResponse.

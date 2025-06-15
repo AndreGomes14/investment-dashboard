@@ -268,3 +268,44 @@
   padding-left: 16px;
   padding-right: 16px;
 }
+
+/* ------------------------
+   Dark Theme Overrides
+------------------------ */
+:host-context(.dark-theme) .investment-card,
+:host-context(.dark-theme) .opportunity-card,
+:host-context(.dark-theme) .investment-card.sold-card {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #333333;
+}
+
+:host-context(.dark-theme) .mat-expansion-panel {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+}
+
+:host-context(.dark-theme) .aggregated-header-title,
+:host-context(.dark-theme) .section-title,
+:host-context(.dark-theme) .section-subtitle,
+:host-context(.dark-theme) .page-header h1 {
+  color: #ffffff;
+}
+
+:host-context(.dark-theme) .label {
+  color: #b0b0b0;
+}
+
+:host-context(.dark-theme) .data-row {
+  border-bottom: 1px solid #333333;
+}
+
+:host-context(.dark-theme) .individual-item {
+  border-bottom: 1px solid #333333;
+}
+
+:host-context(.dark-theme) .investment-card:hover,
+:host-context(.dark-theme) .opportunity-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  background-color: #222222;
+}

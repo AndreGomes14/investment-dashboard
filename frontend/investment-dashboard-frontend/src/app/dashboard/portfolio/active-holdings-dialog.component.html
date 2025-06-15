@@ -1,0 +1,40 @@
+<h2 mat-dialog-title>Active Holdings ({{ data.holdings.length }})</h2>
+<mat-dialog-content>
+  <div class="table-responsive">
+    <table class="holdings-table">
+      <thead>
+        <tr>
+          <th class="sortable">Asset (Ticker)</th>
+          <th class="sortable">Type</th>
+          <th>Units</th>
+          <th>Purchase Price</th>
+          <th>Total Cost</th>
+          <th>Current Price</th>
+          <th class="sortable">Total Value</th>
+          <th>Profit/Loss</th>
+          <th>Profit %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let investment of data.holdings">
+          <td>{{ investment.ticker }}</td>
+          <td>{{ investment.type }}</td>
+          <td>{{ investment.amount | number:'1.0-4' }}</td>
+          <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
+          <td>{{ investment.totalCost | currency:investment.currency:'symbol':'1.2-2' }}</td>
+          <td>{{ (investment.currentValue || 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+          <td>{{ ((investment.currentValue || 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+          <td [ngClass]="(investment.profitOrLoss || 0) >=0 ? 'positive':'negative'">
+            {{ investment.profitOrLoss | currency:investment.currency:'symbol':'1.2-2' }}
+          </td>
+          <td [ngClass]="(investment.percentProfit || 0) >=0 ? 'positive':'negative'">
+            {{ investment.percentProfit | percent:'1.2-2' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions> 

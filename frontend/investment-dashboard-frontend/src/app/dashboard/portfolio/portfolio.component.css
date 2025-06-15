@@ -110,6 +110,10 @@
   color: #2c3e50;
 }
 
+.section-header .spacer {
+  flex: 1;
+}
+
 .table-responsive {
   overflow-x: auto;
 }
@@ -158,6 +162,10 @@
 .historical-chart-card {
   position: relative; /* Needed for absolute positioning of the button */
   transition: all 0.3s ease-in-out;
+}
+
+.historical-chart-card:not(.fullscreen-chart-card) {
+  margin-bottom: 32px;
 }
 
 .fullscreen-button {
@@ -225,4 +233,102 @@ app-root > *:not(.fullscreen-chart-card) {
 
 .details-button:hover {
   color: rgba(0, 0, 0, 0.87);
+}
+
+.holdings-section {
+  margin-top: 32px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.chart-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #2c3e50;
+  flex: 1;
+}
+
+.fullscreen-chart-card .chart-header {
+  padding-bottom: 10px;
+}
+
+.chart-section .section-title {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #2c3e50;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.holdings-table tbody tr:nth-child(odd) {
+  background-color: #fafafa;
+}
+
+.holdings-table th mat-icon {
+  vertical-align: middle;
+  font-size: 16px;
+  margin-left: 4px;
+}
+
+.filter-row th {
+  padding: 4px 8px;
+  background-color: #ffffff;
+}
+
+.asset-filter-field {
+  width: 250px;
+}
+
+.asset-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.asset-header .sortable {
+  display: flex;
+  align-items: center;
+}
+
+.asset-search-inline {
+  width: 200px;
+  margin-left: 4px;
+}
+
+/* ------------------------
+   Dark Theme Overrides
+------------------------ */
+:host-context(.dark-theme) .holdings-table th,
+:host-context(.dark-theme) .holdings-table td {
+  border-bottom: 1px solid #333333;
+  color: #e0e0e0;
+}
+
+:host-context(.dark-theme) .holdings-table th {
+  color: #b0b0b0;
+}
+
+:host-context(.dark-theme) .holdings-table tbody tr:nth-child(odd) {
+  background-color: #1a1a1a;
+}
+
+:host-context(.dark-theme) .holdings-table tr:hover {
+  background-color: #2a2a2a;
+}
+
+:host-context(.dark-theme) .filter-row th {
+  background-color: #1e1e1e;
+}
+
+:host-context(.dark-theme) .asset-search-inline {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #555555;
 }

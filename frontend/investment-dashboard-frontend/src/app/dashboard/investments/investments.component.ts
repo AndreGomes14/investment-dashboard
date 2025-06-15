@@ -516,7 +516,18 @@ export class InvestmentsComponent implements OnInit {
 
   exportData(): void {
     if (this.isAllSelected()) {
-      this.snackBar.open('Please select a portfolio to export.', 'Close', { duration: 3000 });
+      const url = `/api/portfolios/investments/export-all`;
+      const filename = `investments_all.xlsx`;
+      this.http.get(url, { responseType: 'blob' }).subscribe(blob => {
+        if (blob.size > 0) {
+          saveAs(blob, filename);
+          this.snackBar.open('Exported all portfolios successfully.', 'Close', { duration: 3000 });
+        } else {
+          this.snackBar.open('Export failed: empty file.', 'Close', { duration: 3000 });
+        }
+      }, err => {
+        this.snackBar.open('Export failed.', 'Close', { duration: 3000 });
+      });
       return;
     }
 
@@ -544,12 +555,10 @@ export class InvestmentsComponent implements OnInit {
             try {
               const errJson = JSON.parse(reader.result as string);
               message = errJson.message || message;
-            } catch (e) { /* Ignore parsing error */ }
+            } catch (e) { /* ignore */ }
             this.snackBar.open(message, 'Close', { duration: 5000 });
           };
-          reader.onerror = () => {
-            this.snackBar.open(message, 'Close', { duration: 5000 });
-          };
+          reader.onerror = () => this.snackBar.open(message, 'Close', { duration: 5000 });
           reader.readAsText(error.error);
         } else {
           message = error.message || message;
