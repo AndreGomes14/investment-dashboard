@@ -1,14 +1,70 @@
 <div class="dashboard-container">
-  <mat-toolbar color="primary" class="toolbar">
-    <span>Investment Dashboard</span>
-    <span class="spacer"></span>
-    <button mat-icon-button (click)="logout()">
-      <mat-icon>exit_to_app</mat-icon>
-    </button>
-  </mat-toolbar>
+  <mat-sidenav-container>
+    <!-- Side Navigation -->
+    <mat-sidenav #sidenav mode="side" [opened]="sidenavOpened" class="sidenav">
+      <div class="sidenav-header">
+        <mat-icon class="logo-icon">account_balance</mat-icon>
+        <h2>Investment Dashboard</h2>
+      </div>
+      <mat-nav-list>
+        <a mat-list-item routerLink="/dashboard/portfolio" routerLinkActive="active">
+          <mat-icon>pie_chart</mat-icon>
+          <span>Portfolio Overview</span>
+        </a>
+        <a mat-list-item routerLink="/dashboard/investments" routerLinkActive="active">
+          <mat-icon>trending_up</mat-icon>
+          <span>Investments Management</span>
+        </a>
+        <a mat-list-item routerLink="/dashboard/planning" routerLinkActive="active">
+          <mat-icon>account_balance</mat-icon>
+          <span>Financial Planning</span>
+        </a>
+        <a mat-list-item routerLink="/dashboard/reports" routerLinkActive="active">
+          <mat-icon>assessment</mat-icon>
+          <span>Reports & Analytics</span>
+        </a>
+        <a mat-list-item routerLink="/dashboard/settings" routerLinkActive="active">
+          <mat-icon>settings</mat-icon>
+          <span>Account Settings</span>
+        </a>
+        <a mat-list-item routerLink="/dashboard/ai-assistant" routerLinkActive="active">
+          <mat-icon>smart_toy</mat-icon>
+          <span>AI Assistant</span>
+        </a>
+        <div class="spacer"></div>
+        <a mat-list-item (click)="logout()" class="logout-button">
+          <mat-icon>exit_to_app</mat-icon>
+          <span>Logout</span>
+        </a>
+      </mat-nav-list>
+    </mat-sidenav>
 
-  <div class="content">
-    <h1>Welcome to Your Investment Dashboard</h1>
-    <p>Your portfolios and investments will be displayed here.</p>
-  </div>
+    <!-- Main Content -->
+    <mat-sidenav-content>
+      <mat-toolbar color="primary" class="toolbar">
+        <button mat-icon-button (click)="sidenav.toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <span>Investment Dashboard</span>
+        <span class="spacer"></span>
+        <button mat-icon-button [matMenuTriggerFor]="userMenu">
+          <mat-icon>account_circle</mat-icon>
+        </button>
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item routerLink="/dashboard/settings">
+            <mat-icon>person</mat-icon>
+            <span>Profile</span>
+          </button>
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>exit_to_app</mat-icon>
+            <span>Logout</span>
+          </button>
+        </mat-menu>
+      </mat-toolbar>
+
+      <div class="content">
+        <router-outlet></router-outlet>
+      </div>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
 </div>

@@ -1,0 +1,328 @@
+<div class="loading-container" *ngIf="!(summaryData$ | async)">
+  <mat-spinner diameter="50"></mat-spinner>
+  <p>Loading Portfolio Data...</p>
+</div>
+
+<ng-container *ngIf="summaryData$ | async as summaryData">
+
+  <div *ngIf="!summaryData" class="no-data-container">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Error Loading Portfolio</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Could not load portfolio data at this time. Please try again later.</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <div class="portfolio-container" *ngIf="summaryData">
+    <div class="page-header">
+      <h1>Portfolio Overview</h1>
+      <p class="subtitle">{{ summaryData.summary.portfolioName }}</p>
+    </div>
+
+    <div style="margin-bottom: 20px; margin-top: 10px; display: flex; justify-content: flex-start;">
+      <button mat-raised-button color="primary" 
+              (click)="refreshPortfolioValues()" 
+              [disabled]="isRefreshingValues || isLoadingSummary"
+              [attr.aria-label]="portfolioId ? 'Refresh values for this portfolio' : 'Refresh values for all my investments'">
+        <mat-icon *ngIf="!isRefreshingValues">refresh</mat-icon>
+        <mat-progress-spinner *ngIf="isRefreshingValues" mode="indeterminate" diameter="20" style="display: inline-block; margin-right: 8px;"></mat-progress-spinner>
+        {{ isRefreshingValues ? 'Refreshing...' : (portfolioId ? 'Refresh Portfolio Values' : 'Refresh All My Investments') }}
+      </button>
+    </div>
+
+    <div class="metrics-row">
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">payments</mat-icon>
+          <mat-card-title>Total Invested</mat-card-title>
+          <mat-card-subtitle>Cost Basis</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <h2 class="metric-value">{{ summaryData.summary.totalCostBasis | currency:preferredCurrency:'symbol':'1.2-2' }}</h2>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">account_balance_wallet</mat-icon>
+          <mat-card-title>Total Value</mat-card-title>
+          <mat-card-subtitle>Active Holdings</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <h2 class="metric-value">{{ displayTotalValue | currency:preferredCurrency:'symbol':'1.2-2' }}</h2>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">trending_up</mat-icon>
+          <mat-card-title>Unrealized Gain/Loss</mat-card-title>
+          <mat-card-subtitle>Return on Active Holdings</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <h2 class="metric-value" [ngClass]="displayUnrealizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
+            {{ displayUnrealizedPnlAbsolute | currency:preferredCurrency:'symbol':'1.2-2' }}
+          </h2>
+          <div class="metric-change" [ngClass]="summaryData.summary.unrealizedPnlPercentage >= 0 ? 'positive' : 'negative'">
+            <mat-icon>{{ summaryData.summary.unrealizedPnlPercentage >= 0 ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+            <span>{{ summaryData.summary.unrealizedPnlPercentage | number:'1.1-2' }}% unrealized</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">paid</mat-icon>
+          <mat-card-title>Realized Gain/Loss</mat-card-title>
+          <mat-card-subtitle>From Sold Holdings</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <h2 class="metric-value" [ngClass]="summaryData.summary.realizedPnlAbsolute >= 0 ? 'positive' : 'negative'">
+            {{ summaryData.summary.realizedPnlAbsolute | currency:preferredCurrency:'symbol':'1.2-2' }}
+          </h2>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <div class="metrics-row">
+      <!-- Asset Allocation Card -->
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">pie_chart</mat-icon>
+          <mat-card-title>Asset Allocation</mat-card-title>
+          <mat-card-subtitle>By Current Value</mat-card-subtitle>
+          <button mat-icon-button class="details-button" (click)="openAllocationDetails()">
+            <mat-icon>info</mat-icon>
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          <div *ngIf="allocationChartData$ | async as chartData; else noChartData" style="height: 200px;">
+            <ngx-charts-pie-chart
+              *ngIf="chartData.length > 0"
+              [results]="chartData"
+              [legend]="false"
+              [labels]="true"
+              [doughnut]="true"
+              [arcWidth]="0.25"
+              [scheme]="allocationColorScheme" >
+            </ngx-charts-pie-chart>
+            <div *ngIf="chartData.length === 0" class="allocation-chart-placeholder">
+              No allocation data available (value might be zero).
+            </div>
+          </div>
+          <ng-template #noChartData>
+            <div class="allocation-chart-placeholder">Loading chart...</div>
+          </ng-template>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Currency Allocation Card -->
+      <mat-card class="metric-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="metric-icon">public</mat-icon>
+          <mat-card-title>Currency Allocation</mat-card-title>
+          <mat-card-subtitle>By Current Value</mat-card-subtitle>
+          <button mat-icon-button class="details-button" (click)="openCurrencyAllocationDetails()">
+            <mat-icon>info</mat-icon>
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          <div *ngIf="currencyAllocationChartData$ | async as curData; else noCurrencyData" style="height: 200px;">
+            <ngx-charts-pie-chart
+              *ngIf="curData.length > 0"
+              [results]="curData"
+              [legend]="false"
+              [labels]="true"
+              [doughnut]="true"
+              [arcWidth]="0.25"
+              [scheme]="currencyColorScheme">
+            </ngx-charts-pie-chart>
+            <div *ngIf="curData.length === 0" class="allocation-chart-placeholder">
+              No currency allocation data (value might be zero).
+            </div>
+          </div>
+          <ng-template #noCurrencyData>
+            <div class="allocation-chart-placeholder">Loading chart...</div>
+          </ng-template>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Historical Value Chart Section -->
+    <mat-card class="historical-chart-card" 
+              *ngIf="!portfolioId" 
+              [class.fullscreen-chart-card]="isHistoryChartFullscreen">
+      <mat-card-header>
+        <mat-card-title>Overall Portfolio Value History</mat-card-title>
+        <button mat-icon-button (click)="toggleHistoryChartFullscreen()" class="fullscreen-button">
+          <mat-icon>{{ isHistoryChartFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+        </button>
+      </mat-card-header>
+      <mat-card-content [class.fullscreen-chart-content]="isHistoryChartFullscreen">
+        <div class="time-range-selector" style="margin-bottom: 16px;" *ngIf="!isHistoryChartFullscreen">
+          <mat-button-toggle-group #group="matButtonToggleGroup" (valueChange)="setTimeRange($event)" [value]="selectedTimeRange$ | async">
+            <mat-button-toggle value="7d">7D</mat-button-toggle>
+            <mat-button-toggle value="1m">1M</mat-button-toggle>
+            <mat-button-toggle value="3m">3M</mat-button-toggle>
+            <mat-button-toggle value="6m">6M</mat-button-toggle>
+            <mat-button-toggle value="1y">1Y</mat-button-toggle>
+            <mat-button-toggle value="all">All</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        <ng-container *ngIf="historicalData$ | async as historyData">
+          <div *ngIf="isLoadingHistory" class="chart-loading-spinner">
+            <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+            <p>Loading history...</p>
+          </div>
+
+          <div *ngIf="!isLoadingHistory">
+            <div *ngIf="historyData && historyData.length > 0 && historyData[0].series.length > 0; else noHistoryData" 
+                 [style.height.px]="isHistoryChartFullscreen ? (0.8 * windowHeight) : 300"
+                 class="chart-container">
+              <ngx-charts-line-chart
+                [results]="historyData"
+                [scheme]="historyChartColorScheme"
+                [legend]="false"
+                [xAxis]="true"
+                [yAxis]="true"
+                [showXAxisLabel]="true"
+                [showYAxisLabel]="true"
+                [xAxisLabel]="'Date'"
+                [yAxisLabel]="'Total Value'"
+                [autoScale]="true"
+                [timeline]="false"
+                [xAxisTickFormatting]="formatXAxisTick"
+                [roundDomains]="true">
+              </ngx-charts-line-chart>
+            </div>
+            <ng-template #noHistoryData>
+              <p style="text-align: center; padding: 20px;">No historical data available for the selected range.</p>
+            </ng-template>
+          </div>
+        </ng-container>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="holdings-section" *ngIf="summaryData.activeInvestments && summaryData.activeInvestments.length > 0">
+      <div class="section-header">
+        <h2>Active Holdings ({{ summaryData.summary.activeInvestmentsCount }})</h2>
+        <button mat-raised-button color="primary" routerLink="../investments">
+          <mat-icon>settings</mat-icon> Manage Investments
+        </button>
+      </div>
+      <mat-card>
+        <div class="table-responsive">
+          <table class="holdings-table">
+            <thead>
+            <tr>
+              <th>Asset (Ticker)</th>
+              <th>Type</th>
+              <th>Units</th>
+              <th>Purchase Price</th>
+              <th>Total Cost</th>
+              <th>Current Price</th>
+              <th>Total Value</th>
+              <th>Profit/Loss</th>
+              <th>Profit %</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let investment of summaryData.activeInvestments">
+              <td>
+                <ng-container *ngIf="investment.type === 'Other'">
+                  {{ investment.customName || 'Unnamed Custom Asset' }} (Other)
+                </ng-container>
+                <ng-container *ngIf="investment.type !== 'Other'">
+                  {{ investment.ticker }}
+                </ng-container>
+              </td>
+              <td>{{ investment.type }}</td>
+              <td>{{ investment.amount | number:'1.0-4' }}</td>
+              <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>{{ investment.totalCost | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>{{ (investment.currentValue ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>{{ ((investment.currentValue ?? 0) * investment.amount) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>
+                <span class="profit-value"
+                      *ngIf="investment.profitOrLoss !== undefined && investment.profitOrLoss !== null"
+                      [class.positive]="investment.profitOrLoss >= 0"
+                      [class.negative]="investment.profitOrLoss < 0">
+                  {{ investment.profitOrLoss | currency:investment.currency:'symbol':'1.2-2' }}
+                </span>
+                <span class="unavailable" *ngIf="investment.profitOrLoss === undefined || investment.profitOrLoss === null">N/A</span>
+              </td>
+              <td>
+                   <span class="profit-value"
+                         *ngIf="investment.percentProfit !== null"
+                         [class.positive]="(investment.percentProfit ?? 0) > 0"
+                         [class.negative]="(investment.percentProfit ?? 0) < 0">
+                      {{ investment.percentProfit | percent:'1.2-2' }}
+                   </span>
+                <span class="unavailable" *ngIf="investment.percentProfit === null">N/A</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </mat-card>
+    </div>
+
+    <div class="holdings-section" *ngIf="summaryData.soldInvestments && summaryData.soldInvestments.length > 0">
+      <div class="section-header">
+        <h2>Sold Holdings History</h2>
+      </div>
+      <mat-card>
+        <div class="table-responsive">
+          <table class="holdings-table">
+            <thead>
+            <tr>
+              <th>Asset (Ticker)</th>
+              <th>Type</th>
+              <th>Units</th>
+              <th>Purchase Price</th>
+              <th>Sell Price</th>
+              <th>Date Sold</th>
+              <th>Realized PnL</th>
+              <th>Profit %</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let investment of summaryData.soldInvestments">
+              <td>{{ investment.ticker }}</td>
+              <td>{{ investment.type }}</td>
+              <td>{{ investment.amount | number:'1.0-4' }}</td>
+              <td>{{ investment.purchasePrice | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>{{ (investment.sellPrice ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}</td>
+              <td>{{ investment.lastUpdateDate | date:'shortDate' }}</td>
+              <td>
+                   <span class="profit-value"
+                         *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null"
+                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
+                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
+                       {{ ((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) * (investment.amount ?? 0) | currency:investment.currency:'symbol':'1.2-2' }}
+                   </span>
+                <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null">N/A</span>
+              </td>
+              <td>
+                   <span class="profit-value"
+                         *ngIf="investment.sellPrice !== null && investment.purchasePrice !== null && investment.purchasePrice !== 0"
+                         [class.positive]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) > 0"
+                         [class.negative]="((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) < 0">
+                       {{ (((investment.sellPrice ?? 0) - (investment.purchasePrice ?? 0)) / (investment.purchasePrice ?? 1)) | percent:'1.2-2' }}
+                   </span>
+                <span class="unavailable" *ngIf="investment.sellPrice === null || investment.purchasePrice === null || investment.purchasePrice === 0">N/A</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </mat-card>
+    </div>
+
+  </div>
+
+</ng-container>

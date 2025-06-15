@@ -1,5 +1,6 @@
 package com.myapp.investment_dashboard_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -12,17 +13,19 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(exclude = {"settings", "portfolios"})
-@ToString(exclude = {"settings", "portfolios"})
+@EqualsAndHashCode(exclude = {"settings", "portfolios", "roles"})
+@ToString(exclude = {"settings", "portfolios", "roles"})
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(updatable = false, nullable = false, columnDefinition = "UUID")
+    private UUID id;
 
     @Column(unique = true, nullable = false, length = 50)
     private String username;
@@ -45,5 +48,14 @@ public class User {
     private Set<UserSetting> settings = new HashSet<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonBackReference
     private Set<Portfolio> portfolios = new HashSet<>();
+
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
 }

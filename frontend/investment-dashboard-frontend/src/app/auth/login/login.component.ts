@@ -7,10 +7,11 @@ import { LoginRequest } from '../../model/auth.model';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {MatIconModule} from '@angular/material/icon';
 import {MatButtonModule} from '@angular/material/button';
-import {CommonModule, NgOptimizedImage} from '@angular/common';
+import {CommonModule} from '@angular/common';
 import {MatCardModule} from '@angular/material/card';
 import {MatInputModule} from '@angular/material/input';
 import {MatFormFieldModule} from '@angular/material/form-field';
+import {ErrorService} from '../../services/error.service';
 
 @Component({
   selector: 'app-login',
@@ -26,8 +27,7 @@ import {MatFormFieldModule} from '@angular/material/form-field';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    RouterLink,
-    NgOptimizedImage
+    RouterLink
   ]
 })
 export class LoginComponent implements OnInit {
@@ -36,10 +36,11 @@ export class LoginComponent implements OnInit {
   hidePassword = true;
 
   constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router,
-    private snackBar: MatSnackBar
+    private readonly fb: FormBuilder,
+    private readonly authService: AuthService,
+    private readonly router: Router,
+    private readonly snackBar: MatSnackBar,
+    private readonly errorService: ErrorService
   ) { }
 
   ngOnInit(): void {
@@ -64,6 +65,10 @@ export class LoginComponent implements OnInit {
     this.authService.login(loginData).subscribe({
       next: () => {
         this.isLoading = false;
+        this.snackBar.open('Login successful!', 'Close', {
+          duration: 3000,
+          panelClass: ['success-snackbar']
+        });
         this.router.navigate(['/dashboard']);
       },
       error: (error) => {

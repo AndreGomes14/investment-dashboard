@@ -9,28 +9,13 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface InvestmentRepository extends JpaRepository<Investment, Long> {
-    List<Investment> findByPortfolio(Portfolio portfolio);
+public interface InvestmentRepository extends JpaRepository<Investment, UUID> {
+    Optional<Investment> findById(UUID id);
 
-    List<Investment> findByPortfolioAndStatus(Portfolio portfolio, String status);
+    List<Investment> findByPortfolioId(UUID portfolioId);
 
-    @Query("SELECT i FROM Investment i WHERE i.portfolio.id = :portfolioId AND i.status = 'ACTIVE'")
-    List<Investment> findActiveInvestmentsByPortfolioId(Long portfolioId);
-
-    @Query("SELECT i FROM Investment i WHERE i.ticker = :ticker AND i.type = :type AND i.status = 'ACTIVE'")
-    List<Investment> findActiveInvestmentsByTickerAndType(String ticker, String type);
-
-    @Query("SELECT DISTINCT i.ticker, i.type FROM Investment i WHERE i.status = 'ACTIVE'")
-    List<Object[]> findDistinctTickersAndTypesByActiveStatus();
-
-    @Query("SELECT i FROM Investment i WHERE i.lastUpdateDate < :cutoffDate AND i.status = 'ACTIVE'")
-    List<Investment> findStaleInvestments(LocalDateTime cutoffDate);
-
-    @Query("SELECT i FROM Investment i WHERE i.portfolio.user.id = :userId AND i.status = 'ACTIVE'")
-    List<Investment> findActiveInvestmentsByUserId(Long userId);
-
-    Optional<Investment> findByPortfolioAndTickerAndTypeAndStatus(
-            Portfolio portfolio, String ticker, String type, String status);
+    List<Investment> findByPortfolio_IdIn(List<UUID> portfolioIds);
 }

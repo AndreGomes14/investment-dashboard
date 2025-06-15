@@ -1,0 +1,22 @@
+<h1 mat-dialog-title>Create New Portfolio</h1>
+<div mat-dialog-content [formGroup]="portfolioForm">
+  <p>Enter the details for your new portfolio.</p>
+
+  <mat-form-field appearance="fill">
+    <mat-label>Portfolio Name</mat-label>
+    <input matInput formControlName="name" required cdkFocusInitial>
+    <mat-error *ngIf="portfolioForm.get('name')?.hasError('required')">
+      Portfolio name is required.
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field appearance="fill">
+    <mat-label>Description (Optional)</mat-label>
+    <textarea matInput formControlName="description" rows="3"></textarea>
+  </mat-form-field>
+
+</div>
+<div mat-dialog-actions ="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!portfolioForm.valid">Save</button>
+</div>

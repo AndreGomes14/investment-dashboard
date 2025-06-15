@@ -7,14 +7,15 @@ import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class InvestmentDTO {
-    private Long id;
-    private Long portfolioId;
+    private UUID id;
+    private UUID portfolioId;
     private String ticker;
     private String type;
     private BigDecimal amount;

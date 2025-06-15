@@ -2,6 +2,100 @@
 
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 
+// ----------------------------------------------
+// Dark theme styles
+// ----------------------------------------------
+
+// Simple dark theme overrides (without SCSS Material theming functions)
+.dark-theme {
+  background-color: #121212;
+  color: #e0e0e0;
+
+  .mat-mdc-card {
+    background: #1e1e1e;
+    color: inherit;
+    border: 1px solid #ffffff;
+  }
+
+  .mat-toolbar,
+  .mat-sidenav-container,
+  .mat-sidenav-content {
+    background: #1e1e1e;
+    color: inherit;
+  }
+
+  .mat-icon {
+    color: #e0e0e0;
+  }
+
+  // Typography overrides
+  h1, h2, h3, h4, h5, h6 {
+    color: #ffffff;
+  }
+
+  .subtitle,
+  mat-card-subtitle,
+  .mat-card-subtitle,
+  small,
+  p,
+  label,
+  span {
+    color: #bbbbbb;
+  }
+
+  // Ngx-charts dark mode adjustments
+  .ngx-charts {
+    text {
+      fill: #e0e0e0;
+    }
+
+    .gridline,
+    .axis line,
+    .domain {
+      stroke: #666;
+    }
+
+    .legend-label text {
+      fill: #e0e0e0;
+    }
+  }
+
+  // Portfolio header & metric values
+  .page-header h1 {
+    color: #ffffff !important;
+  }
+
+  .page-header .subtitle {
+    color: #bbbbbb !important;
+  }
+
+  .metric-value {
+    color: #ffffff !important;
+  }
+
+  .section-header h2 {
+    color: #ffffff !important;
+  }
+
+  // Investments page
+  h2.section-title {
+    color: #ffffff !important;
+  }
+
+  // Mat tabs
+  .mat-mdc-tab .mdc-tab__text-label,
+  .mat-mdc-tab-label .mdc-tab__text-label,
+  .mat-mdc-tab-label-content,
+  .mat-mdc-tab-link {
+    color: #ffffff !important;
+  }
+
+  // Expansion panel aggregated headers
+  .aggregated-header-title {
+    color: #ffffff !important;
+  }
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -28,4 +122,25 @@ router-outlet {
   width: 100%;
 }
 
-// Other global styles...
+.error-snackbar {
+  background-color: #f44336;
+  color: white;
+
+  .mat-simple-snackbar-action {
+    color: white;
+  }
+}
+
+.success-snackbar {
+  background-color: #4caf50;
+  color: white;
+
+  .mat-simple-snackbar-action {
+    color: white;
+  }
+}
+
+/* Styles for chart fullscreen - hide sidebar */
+body.chart-fullscreen-active mat-sidenav.sidenav {
+  display: none !important;
+}

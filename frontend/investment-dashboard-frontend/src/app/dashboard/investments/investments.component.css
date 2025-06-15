@@ -1,0 +1,270 @@
+.investments-container {
+  padding: 16px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  margin: 4px 0 0 0;
+  font-size: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  color: #7f8c8d;
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+.investment-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.investment-card, .opportunity-card {
+  flex: 1;
+  min-width: 300px;
+  margin-bottom: 16px;
+  transition: transform 0.2s;
+}
+
+.investment-card:hover, .opportunity-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Sold aggregated cards should take full width to avoid two per row */
+.investment-card.sold-card {
+  flex: 1 1 100%;
+  min-width: 100%;
+}
+
+.stock-avatar, .bond-avatar, .alt-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+
+.stock-avatar {
+  background-color: #3498db;
+}
+
+.bond-avatar {
+  background-color: #2ecc71;
+}
+
+.alt-avatar {
+  background-color: #9b59b6;
+}
+
+.opportunity-icon {
+  background-color: #f39c12;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 8px;
+}
+
+.investment-data {
+  margin-top: 16px;
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.data-row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.value {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.positive {
+  color: #27ae60;
+}
+
+.negative {
+  color: #e74c3c;
+}
+
+@media (max-width: 768px) {
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .investment-card, .opportunity-card {
+    min-width: 100%;
+  }
+}
+
+/* Styles for Aggregated View Expansion Panel */
+.aggregated-header-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px; /* Adjust as needed */
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+
+.ticker-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ticker-main {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.ticker-type {
+  font-size: 0.9em;
+  color: grey;
+}
+
+.header-right.summary-values {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px; /* Adjust spacing between items */
+  flex-wrap: nowrap;
+  text-align: right;
+  flex-grow: 1;
+  margin-left: 20px; /* Space between left and right */
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.summary-item .label {
+  font-size: 0.8em;
+  color: grey;
+  margin-bottom: 2px;
+}
+
+.summary-item .value {
+  font-weight: 500;
+  white-space: nowrap; /* Prevent values from wrapping */
+}
+
+.stock-avatar.aggregated-avatar {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 1em;
+}
+
+.profit-value.positive {
+  color: #4CAF50; /* Green */
+}
+.profit-value.negative {
+  color: #F44336; /* Red */
+}
+.value.unavailable {
+  color: #9e9e9e; /* Grey */
+  font-style: italic;
+}
+
+/* Styles for list inside expansion panel */
+.individual-investment-list {
+  padding: 10px 20px;
+}
+
+.individual-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9em;
+}
+.individual-item:last-child {
+  border-bottom: none;
+}
+.individual-item span {
+  margin-right: 10px; /* Spacing between text elements */
+}
+
+.individual-action-button {
+  margin-left: 8px; /* Space before buttons */
+  transform: scale(0.8); /* Make buttons slightly smaller */
+}
+
+.individual-action-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Force aggregated cards to take full width */
+.investment-cards .aggregated-card {
+  flex-basis: 100%; /* Ensure it takes full width as flex item */
+  flex-grow: 0; /* Don't allow it to grow */
+  flex-shrink: 0; /* Don't allow it to shrink */
+  width: 100%; /* Explicit width */
+  min-width: initial; /* Override previous min-width */
+}
+
+/* Adjust padding specifically for aggregated panel header if needed */
+.aggregated-card .mat-expansion-panel-header {
+  padding-left: 16px;
+  padding-right: 16px;
+}

@@ -1,40 +1,30 @@
-// src/app/interceptors/auth.interceptor.ts
-import { Injectable } from '@angular/core';
-import {
-  HttpRequest,
-  HttpHandler,
-  HttpEvent,
-  HttpInterceptor,
-  HttpErrorResponse
-} from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { HttpRequest, HttpHandlerFn, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { catchError, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-@Injectable()
-export class AuthInterceptor implements HttpInterceptor {
-  constructor(private authService: AuthService, private router: Router) {}
+export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
 
-  intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
-    const token = this.authService.getToken();
+  const token = authService.getToken();
 
-    if (token) {
-      const clonedRequest = request.clone({
-        headers: request.headers.set('Authorization', `Bearer ${token}`)
-      });
+  if (token) {
+    const clonedRequest = req.clone({
+      headers: req.headers.set('Authorization', `Bearer ${token}`)
+    });
 
-      return next.handle(clonedRequest).pipe(
-        catchError((error: HttpErrorResponse) => {
-          if (error.status === 401) {
-            this.authService.logout();
-            this.router.navigate(['/login']);
-          }
-          return throwError(() => error);
-        })
-      );
-    }
-
-    return next.handle(request);
+    return next(clonedRequest).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401) {
+          authService.logout();
+          router.navigate(['/login']);
+        }
+        return throwError(() => error);
+      })
+    );
   }
-}
+
+  return next(req);
+};

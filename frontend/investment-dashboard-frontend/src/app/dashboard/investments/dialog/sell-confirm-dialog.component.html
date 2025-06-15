@@ -1,0 +1,23 @@
+<h2 mat-dialog-title>Confirm Sell: {{ data.investment.ticker }}</h2>
+<form [formGroup]="sellForm" (ngSubmit)="onConfirmSell()">
+  <mat-dialog-content>
+    <p>
+      You are selling {{ data.investment.amount }} units of {{ data.investment.ticker }}.
+      Please enter the selling price per unit.
+    </p>
+    <mat-form-field appearance="fill">
+      <mat-label>Sell Price (per unit)</mat-label>
+      <input matInput type="number" formControlName="sellPrice" placeholder="e.g., 210.50" required>
+      <span matTextPrefix>{{ data.investment.currency }}&nbsp;</span>
+      <mat-error *ngIf="sellForm.get('sellPrice')?.hasError('required')">Sell price is required.</mat-error>
+      <mat-error *ngIf="sellForm.get('sellPrice')?.hasError('min')">Sell price cannot be negative.</mat-error>
+    </mat-form-field>
+    <p><small>Note: This will mark the investment as SOLD but not delete the record.</small></p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="onNoClick()">Cancel</button>
+    <button mat-raised-button color="warn" type="submit" [disabled]="!sellForm.valid">
+      <mat-icon>sell</mat-icon> Confirm Sell
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -1,0 +1,50 @@
+<h2 mat-dialog-title>Edit Investment: {{ investment.ticker || 'N/A' }}</h2>
+
+<mat-dialog-content [formGroup]="investmentForm">
+  <p>
+    Type: <strong>{{ investment.type || 'N/A' }}</strong>,
+    Currency: <strong>{{ investment.currency || 'N/A' }}</strong>
+  </p>
+
+  <mat-form-field appearance="fill" class="full-width">
+    <mat-label>Amount (Units/Shares)</mat-label>
+    <input matInput type="number" formControlName="amount" required>
+    <mat-error *ngIf="investmentForm.get('amount')?.hasError('required')">
+      Amount is required.
+    </mat-error>
+    <mat-error *ngIf="investmentForm.get('amount')?.hasError('min')">
+      Amount must be positive.
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field appearance="fill" class="full-width">
+    <mat-label>Purchase Price (per Unit)</mat-label>
+    <input matInput type="number" formControlName="purchasePrice" required>
+    <mat-error *ngIf="investmentForm.get('purchasePrice')?.hasError('required')">
+      Purchase price is required.
+    </mat-error>
+    <mat-error *ngIf="investmentForm.get('purchasePrice')?.hasError('min')">
+      Purchase price must be non-negative.
+    </mat-error>
+  </mat-form-field>
+
+  <mat-form-field appearance="fill" class="full-width" *ngIf="investment.type?.toUpperCase() === 'OTHER'">
+    <mat-label>Current Value (per Unit)</mat-label>
+    <input matInput type="number" formControlName="currentValue" placeholder="e.g., 175.00">
+    <mat-error *ngIf="investmentForm.get('currentValue')?.hasError('required')">Current value is required.</mat-error>
+    <mat-error *ngIf="investmentForm.get('currentValue')?.hasError('min')">Value cannot be negative.</mat-error>
+  </mat-form-field>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!investmentForm.valid">Save Changes</button>
+</mat-dialog-actions>
+
+<style>
+  .full-width {
+    width: 100%;
+    margin-bottom: 1em;
+  }
+</style>

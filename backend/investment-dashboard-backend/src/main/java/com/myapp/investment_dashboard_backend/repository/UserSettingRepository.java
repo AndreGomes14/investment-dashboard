@@ -7,12 +7,9 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface UserSettingRepository extends JpaRepository<UserSetting, Long> {
-    List<UserSetting> findByUser(User user);
-
-    List<UserSetting> findByUserAndKeyStartingWith(User user, String keyPrefix);
-
-    Optional<UserSetting> findByUserAndKey(User user, String key);
+public interface UserSettingRepository extends JpaRepository<UserSetting, UUID> {
+    Optional<UserSetting> findByUserIdAndKey(UUID userId, String key);
 }
