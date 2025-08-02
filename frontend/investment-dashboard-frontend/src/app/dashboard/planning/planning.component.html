@@ -1,1 +1,409 @@
-<p>planning works!</p>
+<div class="planning-container">
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading financial planning data...</p>
+  </div>
+
+  <!-- Main Content -->
+  <div *ngIf="!loading">
+    
+    <!-- Financial Profile Setup (shown when no profile exists) -->
+    <mat-card *ngIf="!financialProfile" class="welcome-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>account_balance_wallet</mat-icon>
+          Welcome to Financial Planning
+        </mat-card-title>
+        <mat-card-subtitle>Let's start by setting up your financial profile</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p>To get started with financial planning, we need to understand your monthly income and expenses. This will help us calculate your savings capacity and provide personalized recommendations for achieving your financial goals.</p>
+        
+        <form [formGroup]="profileForm" (ngSubmit)="onSaveProfile()" class="profile-form">
+          <div class="form-row">
+            <mat-form-field appearance="outline">
+              <mat-label>Monthly Income</mat-label>
+              <input matInput type="number" formControlName="monthlyIncome" placeholder="5000">
+              <span matPrefix>$&nbsp;</span>
+              <mat-error *ngIf="profileForm.get('monthlyIncome')?.hasError('required')">
+                Monthly income is required
+              </mat-error>
+              <mat-error *ngIf="profileForm.get('monthlyIncome')?.hasError('min')">
+                Monthly income must be greater than 0
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Monthly Expenses</mat-label>
+              <input matInput type="number" formControlName="monthlyExpenses" placeholder="3000">
+              <span matPrefix>$&nbsp;</span>
+              <mat-error *ngIf="profileForm.get('monthlyExpenses')?.hasError('required')">
+                Monthly expenses is required
+              </mat-error>
+              <mat-error *ngIf="profileForm.get('monthlyExpenses')?.hasError('min')">
+                Monthly expenses cannot be negative
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Currency</mat-label>
+              <mat-select formControlName="currency">
+                <mat-option value="USD">USD - US Dollar</mat-option>
+                <mat-option value="EUR">EUR - Euro</mat-option>
+                <mat-option value="GBP">GBP - British Pound</mat-option>
+                <mat-option value="CAD">CAD - Canadian Dollar</mat-option>
+                <mat-option value="AUD">AUD - Australian Dollar</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <div class="form-actions">
+            <button mat-raised-button color="primary" type="submit" [disabled]="!profileForm.valid">
+              <mat-icon>save</mat-icon>
+              Create Financial Profile
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Main Dashboard (shown when profile exists) -->
+    <div *ngIf="financialProfile">
+      
+      <!-- Financial Overview Cards -->
+      <div class="overview-grid">
+        <mat-card class="overview-card income-card">
+          <mat-card-content>
+            <div class="card-header">
+              <mat-icon>trending_up</mat-icon>
+              <span>Monthly Income</span>
+            </div>
+            <div class="amount">{{ formatCurrency(financialProfile.monthlyIncome) }}</div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="overview-card expenses-card">
+          <mat-card-content>
+            <div class="card-header">
+              <mat-icon>trending_down</mat-icon>
+              <span>Monthly Expenses</span>
+            </div>
+            <div class="amount">{{ formatCurrency(financialProfile.monthlyExpenses) }}</div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="overview-card savings-card">
+          <mat-card-content>
+            <div class="card-header">
+              <mat-icon>savings</mat-icon>
+              <span>Monthly Savings</span>
+            </div>
+            <div class="amount">{{ formatCurrency(getMonthlySavings()) }}</div>
+            <div class="subtitle">{{ getSavingsRate() | number:'1.1-1' }}% savings rate</div>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="overview-card goals-card">
+          <mat-card-content>
+            <div class="card-header">
+              <mat-icon>flag</mat-icon>
+              <span>Active Goals</span>
+            </div>
+            <div class="amount">{{ getActiveGoalsCount() }}</div>
+            <div class="subtitle">Total value: {{ formatCurrency(getTotalGoalsValue()) }}</div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- Tabs for different sections -->
+      <mat-tab-group [(selectedIndex)]="selectedTabIndex" class="planning-tabs">
+        
+        <!-- Goals Management Tab -->
+        <mat-tab label="Financial Goals">
+          <div class="tab-content">
+            
+            <!-- Goals Header -->
+            <div class="goals-header">
+              <h2>Your Financial Goals</h2>
+              <button mat-raised-button color="primary" (click)="showGoalForm = true; editingGoal = null; resetGoalForm()">
+                <mat-icon>add</mat-icon>
+                Add New Goal
+              </button>
+            </div>
+
+            <!-- Goal Form -->
+            <mat-card *ngIf="showGoalForm" class="goal-form-card">
+              <mat-card-header>
+                <mat-card-title>
+                  {{ editingGoal ? 'Edit Goal' : 'Create New Goal' }}
+                </mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <form [formGroup]="goalForm" (ngSubmit)="editingGoal ? onUpdateGoal() : onCreateGoal()" class="goal-form">
+                  <div class="form-row">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Goal Name</mat-label>
+                      <input matInput formControlName="goalName" placeholder="e.g., New Car">
+                      <mat-error *ngIf="goalForm.get('goalName')?.hasError('required')">
+                        Goal name is required
+                      </mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Goal Type</mat-label>
+                      <mat-select formControlName="goalType">
+                        <mat-option *ngFor="let type of goalTypes" [value]="type">
+                          {{ goalTypeDisplayNames[type] }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Priority (1-10)</mat-label>
+                      <input matInput type="number" formControlName="priority" min="1" max="10">
+                      <mat-hint>1 = highest priority, 10 = lowest</mat-hint>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="form-row">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Target Amount</mat-label>
+                      <input matInput type="number" formControlName="targetAmount" placeholder="25000">
+                      <span matPrefix>{{ financialProfile.currency }}&nbsp;</span>
+                      <mat-error *ngIf="goalForm.get('targetAmount')?.hasError('required')">
+                        Target amount is required
+                      </mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Current Saved</mat-label>
+                      <input matInput type="number" formControlName="currentSaved" placeholder="0">
+                      <span matPrefix>{{ financialProfile.currency }}&nbsp;</span>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Target Date</mat-label>
+                      <input matInput [matDatepicker]="picker" formControlName="targetDate">
+                      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                      <mat-datepicker #picker></mat-datepicker>
+                      <mat-error *ngIf="goalForm.get('targetDate')?.hasError('required')">
+                        Target date is required
+                      </mat-error>
+                    </mat-form-field>
+                  </div>
+
+                  <mat-form-field appearance="outline" *ngIf="editingGoal">
+                    <mat-label>Status</mat-label>
+                    <mat-select formControlName="status">
+                      <mat-option *ngFor="let status of goalStatuses" [value]="status">
+                        {{ goalStatusDisplayNames[status] }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Description (Optional)</mat-label>
+                    <textarea matInput formControlName="goalDescription" rows="3" placeholder="Additional details about your goal..."></textarea>
+                  </mat-form-field>
+
+                  <div class="form-actions">
+                    <button mat-button type="button" (click)="showGoalForm = false; editingGoal = null">
+                      Cancel
+                    </button>
+                    <button mat-raised-button color="primary" type="submit" [disabled]="!goalForm.valid">
+                      <mat-icon>{{ editingGoal ? 'save' : 'add' }}</mat-icon>
+                      {{ editingGoal ? 'Update Goal' : 'Create Goal' }}
+                    </button>
+                  </div>
+                </form>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Goals List -->
+            <div class="goals-grid" *ngIf="financialGoals.length > 0">
+              <mat-card *ngFor="let goal of financialGoals" class="goal-card">
+                <mat-card-header>
+                  <mat-card-title>
+                    <div class="goal-title">
+                      <span>{{ goal.goalName }}</span>
+                      <mat-chip [color]="getGoalStatusColor(goal.status)" selected>
+                        {{ goalStatusDisplayNames[goal.status] }}
+                      </mat-chip>
+                    </div>
+                  </mat-card-title>
+                  <mat-card-subtitle>
+                    {{ goalTypeDisplayNames[goal.goalType] }} • Priority {{ goal.priority }}
+                  </mat-card-subtitle>
+                </mat-card-header>
+                
+                <mat-card-content>
+                  <div class="goal-progress">
+                    <div class="progress-header">
+                      <span>{{ formatCurrency(goal.currentSaved) }} of {{ formatCurrency(goal.targetAmount) }}</span>
+                      <span class="progress-percentage">{{ goal.progressPercentage | number:'1.0-0' }}%</span>
+                    </div>
+                    <mat-progress-bar 
+                      [value]="goal.progressPercentage" 
+                      [color]="getProgressColor(goal.progressPercentage || 0)">
+                    </mat-progress-bar>
+                  </div>
+
+                  <div class="goal-details">
+                    <div class="detail-row">
+                      <mat-icon>schedule</mat-icon>
+                      <span>Target Date: {{ formatDate(goal.targetDate) }}</span>
+                    </div>
+                    <div class="detail-row" *ngIf="goal.monthsToTarget">
+                      <mat-icon>access_time</mat-icon>
+                      <span>{{ goal.monthsToTarget }} months remaining</span>
+                    </div>
+                    <div class="detail-row" *ngIf="goal.requiredMonthlySaving">
+                      <mat-icon>trending_up</mat-icon>
+                      <span>Required: {{ formatCurrency(goal.requiredMonthlySaving) }}/month</span>
+                    </div>
+                    <div class="detail-row" *ngIf="goal.goalDescription">
+                      <mat-icon>description</mat-icon>
+                      <span>{{ goal.goalDescription }}</span>
+                    </div>
+                  </div>
+                </mat-card-content>
+
+                <mat-card-actions>
+                  <button mat-button (click)="onEditGoal(goal)">
+                    <mat-icon>edit</mat-icon>
+                    Edit
+                  </button>
+                  <button mat-button color="warn" (click)="onDeleteGoal(goal)">
+                    <mat-icon>delete</mat-icon>
+                    Delete
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+
+            <!-- Empty State -->
+            <mat-card *ngIf="financialGoals.length === 0 && !showGoalForm" class="empty-state">
+              <mat-card-content>
+                <mat-icon>flag</mat-icon>
+                <h3>No Financial Goals Yet</h3>
+                <p>Start planning your financial future by creating your first goal.</p>
+                <button mat-raised-button color="primary" (click)="showGoalForm = true; resetGoalForm()">
+                  <mat-icon>add</mat-icon>
+                  Create Your First Goal
+                </button>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+
+        <!-- Analytics Tab -->
+        <mat-tab label="Analytics">
+          <div class="tab-content">
+            <h2>Financial Analytics</h2>
+            
+            <div class="charts-grid" *ngIf="financialGoals.length > 0">
+              <!-- Goal Progress Chart -->
+              <mat-card class="chart-card">
+                <mat-card-header>
+                  <mat-card-title>Goals Progress</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <ngx-charts-bar-vertical
+                    [results]="goalProgressChartData"
+                    [xAxis]="true"
+                    [yAxis]="true"
+                    [showXAxisLabel]="true"
+                    [showYAxisLabel]="true"
+                    xAxisLabel="Goals"
+                    yAxisLabel="Progress (%)">
+                  </ngx-charts-bar-vertical>
+                </mat-card-content>
+              </mat-card>
+
+              <!-- Timeline Chart -->
+              <mat-card class="chart-card">
+                <mat-card-header>
+                  <mat-card-title>Timeline to Goals</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <ngx-charts-bar-horizontal
+                    [results]="goalTimelineChartData"
+                    [xAxis]="true"
+                    [yAxis]="true"
+                    [showXAxisLabel]="true"
+                    [showYAxisLabel]="true"
+                    xAxisLabel="Months"
+                    yAxisLabel="Goals">
+                  </ngx-charts-bar-horizontal>
+                </mat-card-content>
+              </mat-card>
+            </div>
+
+            <!-- Empty Analytics State -->
+            <mat-card *ngIf="financialGoals.length === 0" class="empty-state">
+              <mat-card-content>
+                <mat-icon>analytics</mat-icon>
+                <h3>No Data to Analyze</h3>
+                <p>Create some financial goals to see analytics and insights.</p>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+
+        <!-- Profile Settings Tab -->
+        <mat-tab label="Profile Settings">
+          <div class="tab-content">
+            <mat-card class="profile-settings-card">
+              <mat-card-header>
+                <mat-card-title>Financial Profile Settings</mat-card-title>
+                <mat-card-subtitle>Update your monthly income and expenses</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <form [formGroup]="profileForm" (ngSubmit)="onUpdateProfile()" class="profile-form">
+                  <div class="form-row">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Monthly Income</mat-label>
+                      <input matInput type="number" formControlName="monthlyIncome">
+                      <span matPrefix>{{ financialProfile.currency }}&nbsp;</span>
+                      <mat-error *ngIf="profileForm.get('monthlyIncome')?.hasError('required')">
+                        Monthly income is required
+                      </mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Monthly Expenses</mat-label>
+                      <input matInput type="number" formControlName="monthlyExpenses">
+                      <span matPrefix>{{ financialProfile.currency }}&nbsp;</span>
+                      <mat-error *ngIf="profileForm.get('monthlyExpenses')?.hasError('required')">
+                        Monthly expenses is required
+                      </mat-error>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="savings-info">
+                    <div class="info-item">
+                      <span class="label">Current Monthly Savings:</span>
+                      <span class="value">{{ formatCurrency(getMonthlySavings()) }}</span>
+                    </div>
+                    <div class="info-item">
+                      <span class="label">Savings Rate:</span>
+                      <span class="value">{{ getSavingsRate() | number:'1.1-1' }}%</span>
+                    </div>
+                  </div>
+
+                  <div class="form-actions">
+                    <button mat-raised-button color="primary" type="submit" [disabled]="!profileForm.valid">
+                      <mat-icon>save</mat-icon>
+                      Update Profile
+                    </button>
+                  </div>
+                </form>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </div>
+  </div>
+</div>
